@@ -68,12 +68,13 @@ async function getVideoInfo(url) {
     const cached = cache.get(cacheKey);
     if (cached) return cached;
 
-    const clients = ['ios', 'android', 'web'];
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
 
     for (const client of clients) {
         try {
             console.log(`🔎 Fetching metadata via client: ${client}...`);
-            const info = await youtubedl(url, {
+            const flags = {
                 dumpSingleJson: true,
                 noWarnings: true,
                 noCallHome: true,
@@ -81,9 +82,14 @@ async function getVideoInfo(url) {
                 youtubeSkipDashManifest: true,
                 ffmpegLocation: FFMPEG_LOCATION,
                 forceIpv4: true,
-                extractorArgs: `youtube:player_client=${client}`,
                 cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined
-            }, {
+            };
+
+            if (isYouTube && client !== 'default') {
+                flags.extractorArgs = `youtube:player_client=${client}`;
+            }
+
+            const info = await youtubedl(url, flags, {
                 youtubeDlBinary: YOUTUBE_DL_BINARY,
                 userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
             });
@@ -120,6 +126,8 @@ async function downloadMedia(url, type, options = {}) {
         httpChunkSize: '10M',
     };
 
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+
     if (type === 'audio') {
         Object.assign(flags, {
             extractAudio: true,
@@ -127,9 +135,16 @@ async function downloadMedia(url, type, options = {}) {
         });
     } else if (type === 'video') {
         const isNumericHeight = /^\d+$/.test(height);
-        const formatSelect = isNumericHeight
-            ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best`
-            : 'best[ext=mp4]/best';
+        let formatSelect;
+
+        if (isYouTube) {
+            formatSelect = isNumericHeight
+                ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best`
+                : 'best[ext=mp4]/best';
+        } else {
+            // Social Media platforms (Instagram, TikTok, etc.)
+            formatSelect = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+        }
 
         Object.assign(flags, {
             format: formatSelect,
@@ -137,13 +152,17 @@ async function downloadMedia(url, type, options = {}) {
         });
     }
 
-    const clients = ['ios', 'android', 'web'];
+    const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
     let lastError = null;
 
     for (const client of clients) {
         try {
             console.log(`📡 Attempting download with client: ${client}...`);
-            const currentFlags = { ...flags, extractorArgs: `youtube:player_client=${client}` };
+            const currentFlags = { ...flags };
+            if (isYouTube && client !== 'default') {
+                currentFlags.extractorArgs = `youtube:player_client=${client}`;
+            }
+
             const result = await youtubedl(url, currentFlags, {
                 youtubeDlBinary: YOUTUBE_DL_BINARY,
                 userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
