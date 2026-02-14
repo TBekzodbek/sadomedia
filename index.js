@@ -371,31 +371,27 @@ function startBot() {
                 return;
             }
 
-            setRequest(chatId, { url, title: title, type: typeContext });
+            setRequest(chatId, { url, title: title, type: 'video' });
 
-            const keyboard = [
-                [{ text: '📹 Video', callback_data: 'target_video' }, { text: '🎵 Audio', callback_data: 'target_mp3' }],
-                [{ text: '❌ Bekor qilish', callback_data: 'cancel_req' }]
-            ];
-
-            const menuOptions = {
-                parse_mode: 'Markdown',
-                reply_markup: { inline_keyboard: keyboard }
+            const safeTitle = cleanFilename(title);
+            const options = {
+                outputPath: path.join(DOWNLOADS_DIR, `${safeTitle}_${Date.now()}.%(ext)s`),
+                height: 'best'
             };
 
-            const caption = `🎬 **${title}**\n\n${getText(lang, 'select_quality')}`;
+            const mediaOptions = {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🎵 Audio (MP3)', callback_data: 'target_mp3' }]
+                    ]
+                }
+            };
 
-            // NEW: Send Thumbnail if available
-            if (info && info.thumbnail) {
-                bot.sendPhoto(chatId, info.thumbnail, {
-                    caption: caption,
-                    ...menuOptions
-                }).catch(() => {
-                    // Fallback to text if photo fails
-                    bot.sendMessage(chatId, caption, menuOptions);
-                });
-            } else {
-                bot.sendMessage(chatId, caption, menuOptions);
+            const stopAction = sendActionLoop(chatId, 'upload_video');
+            try {
+                await handleDownload(chatId, url, 'video', options, title, null, mediaOptions);
+            } finally {
+                stopAction();
             }
         } catch (error) {
             console.error(error);
@@ -550,7 +546,12 @@ function startBot() {
         const { url, title } = reqData;
         const safeTitle = cleanFilename(title);
 
-        bot.deleteMessage(chatId, query.message.message_id);
+        if (data === 'target_mp3' && query.message.video) {
+            // If from audio button on video, don't delete the video message
+        } else {
+            bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
+        }
+
         debugSend(chatId, getText(lang, 'downloading'));
 
         // Determine options
@@ -574,7 +575,7 @@ function startBot() {
         }
     });
 
-    async function handleDownload(chatId, url, type, options, title, customMenu = null) {
+    async function handleDownload(chatId, url, type, options, title, customMenu = null, mediaOptions = {}) {
         const lang = getLang(chatId);
         try {
             const filePath = await downloadMedia(url, type, options);
@@ -595,10 +596,15 @@ function startBot() {
                 await bot.sendAudio(chatId, filePath, {
                     title: title || 'Audio',
                     performer: '@SadoMedia_bot',
-                    caption: `🎧 @SadoMedia_bot`
+                    caption: `🎧 @SadoMedia_bot`,
+                    ...mediaOptions
                 });
             } else {
-                await bot.sendVideo(chatId, filePath, { caption: `${title || 'Video'}\n\n🤖 @SadoMedia_bot`, supports_streaming: true });
+                await bot.sendVideo(chatId, filePath, {
+                    caption: `${title || 'Video'}\n\n🤖 @SadoMedia_bot`,
+                    supports_streaming: true,
+                    ...mediaOptions
+                });
             }
 
             await fs.remove(filePath);
