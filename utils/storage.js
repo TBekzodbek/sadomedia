@@ -1,118 +1,122 @@
-const fs = require('fs-extra');
-const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
-const DATA_DIR = path.join(__dirname, '../data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ihsiuquldbepzdlwojpz.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
-// Ensure data directory exists
-fs.ensureDirSync(DATA_DIR);
+if (!SUPABASE_KEY) {
+    console.error('⚠️ WARNING: SUPABASE_KEY is missing. Database operations will fail.');
+}
 
-// Load data or initialize defaults
-let db = {
-    users: {},    // { chatId: { lang: 'uz', state: 'MAIN' } }
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY || 'placeholder');
+
+// Persistent User Data
+async function getUser(chatId, info = {}) {
+    const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('chat_id', chatId)
+        .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
+        console.error('Supabase getUser Error:', error);
+    }
+
+    if (!user) {
+        const { data: newUser, error: createError } = await supabase
+            .from('users')
+            .insert([{ chat_id: chatId, lang: 'uz', state: 'MAIN', ...info }])
+            .select()
+            .single();
+
+        if (createError) console.error('Supabase createUser Error:', createError);
+        return newUser || { lang: 'uz', state: 'MAIN' };
+    }
+
+    if (Object.keys(info).length > 0) {
+        const { data: updatedUser, error: updateError } = await supabase
+            .from('users')
+            .update({ ...info, updated_at: new Date() })
+            .eq('chat_id', chatId)
+            .select()
+            .single();
+
+        if (updateError) console.error('Supabase updateUser Error:', updateError);
+        return updatedUser || user;
+    }
+
+    return user;
+}
+
+async function getAllUsers() {
+    const { data, error } = await supabase.from('users').select('*');
+    if (error) console.error('Supabase getAllUsers Error:', error);
+
+    // Convert array to object to match old API if needed, 
+    // or return as is and update index.js
+    const userMap = {};
+    (data || []).forEach(u => {
+        userMap[u.chat_id] = u;
+    });
+    return userMap;
+}
+
+async function getLang(chatId) {
+    const user = await getUser(chatId);
+    return user.lang || 'uz';
+}
+
+async function setLang(chatId, lang) {
+    const { error } = await supabase
+        .from('users')
+        .update({ lang, updated_at: new Date() })
+        .eq('chat_id', chatId);
+    if (error) console.error('Supabase setLang Error:', error);
+}
+
+async function getState(chatId) {
+    const user = await getUser(chatId);
+    return user.state || 'MAIN';
+}
+
+async function setState(chatId, state) {
+    const { error } = await supabase
+        .from('users')
+        .update({ state, updated_at: new Date() })
+        .eq('chat_id', chatId);
+    if (error) console.error('Supabase setState Error:', error);
+}
+
+// In-memory data for transient states (Requests & Search Results)
+// These don't need to be in Supabase as they expire quickly
+let transientDb = {
     requests: {}, // { chatId: { url, title, type, timestamp } }
     results: {},  // { chatId: { total: [], page: 0 } }
 };
 
-if (fs.existsSync(DB_FILE)) {
-    try {
-        db = fs.readJsonSync(DB_FILE);
-    } catch (error) {
-        console.error('Error reading DB file:', error);
-        // Backup corrupted file
-        fs.moveSync(DB_FILE, `${DB_FILE}.bak.${Date.now()}`);
-    }
-} else {
-    fs.writeJsonSync(DB_FILE, db);
-}
-
-function save() {
-    try {
-        fs.writeJsonSync(DB_FILE, db, { spaces: 2 });
-    } catch (error) {
-        console.error('Error saving DB:', error);
-    }
-}
-
-function getUser(chatId, info = {}) {
-    if (!db.users[chatId]) {
-        db.users[chatId] = { lang: 'uz', state: 'MAIN', ...info };
-        save();
-    } else if (Object.keys(info).length > 0) {
-        // Update existing user info (e.g. username)
-        db.users[chatId] = { ...db.users[chatId], ...info };
-        save();
-    }
-    return db.users[chatId];
-}
-
-function getAllUsers() {
-    return db.users;
-}
-
-function getLang(chatId) {
-    return getUser(chatId).lang || 'uz';
-}
-
-function setLang(chatId, lang) {
-    const user = getUser(chatId);
-    user.lang = lang;
-    save();
-}
-
-function getState(chatId) {
-    return getUser(chatId).state || 'MAIN';
-}
-
-function setState(chatId, state) {
-    const user = getUser(chatId);
-    user.state = state;
-    save();
-}
-
 function getRequest(chatId) {
-    return db.requests[chatId];
+    return transientDb.requests[chatId];
 }
 
 function setRequest(chatId, data) {
     if (data === null) {
-        delete db.requests[chatId];
+        delete transientDb.requests[chatId];
     } else {
-        db.requests[chatId] = { ...data, timestamp: Date.now() };
+        transientDb.requests[chatId] = { ...data, timestamp: Date.now() };
     }
-    save();
 }
 
 function getResults(chatId) {
-    return db.results[chatId];
+    return transientDb.results[chatId];
 }
 
 function setResults(chatId, data) {
     if (data === null) {
-        delete db.results[chatId];
+        delete transientDb.results[chatId];
     } else {
-        db.results[chatId] = data;
+        transientDb.results[chatId] = data;
     }
-    save();
 }
-
-// Cleanup old requests (older than 24 hours) to keep DB small
-function cleanup() {
-    const now = Date.now();
-    const expiry = 24 * 60 * 60 * 1000;
-    let changed = false;
-
-    for (const chatId in db.requests) {
-        if (now - db.requests[chatId].timestamp > expiry) {
-            delete db.requests[chatId];
-            changed = true;
-        }
-    }
-    if (changed) save();
-}
-
-// Run cleanup once on load
-cleanup();
 
 module.exports = {
     getLang,

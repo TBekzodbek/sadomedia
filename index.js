@@ -166,9 +166,9 @@ function startBot() {
     // Removed static MAIN_MENU and BACK_MENU in favor of dynamic functions
 
     // 1. Handle /start
-    bot.onText(/\/start/, (msg) => {
+    bot.onText(/\/start/, async (msg) => {
         const chatId = msg.chat.id;
-        setUserState(chatId, STATES.MAIN);
+        await setUserState(chatId, STATES.MAIN);
 
         // Send Welcome Message first
         debugSend(chatId, "👋 **Welcome to SadoMedia Bot!**\n\n🇺🇿 Xush kelibsiz!\n🇷🇺 Добро пожаловать!", { parse_mode: 'Markdown' })
@@ -188,11 +188,11 @@ function startBot() {
 
 
     // Admin Command: /admin
-    bot.onText(/\/admin/, (msg) => {
+    bot.onText(/\/admin/, async (msg) => {
         const chatId = msg.chat.id;
         if (!isAdmin(chatId)) return;
 
-        const lang = getLang(chatId);
+        const lang = await getLang(chatId);
         const adminKeyboard = {
             reply_markup: {
                 inline_keyboard: [
@@ -231,7 +231,7 @@ function startBot() {
 
         if (!isAdmin(chatId)) return;
 
-        const allUsers = getAllUsers();
+        const allUsers = await getAllUsers();
         const userCount = Object.keys(allUsers).length;
 
         const statsMsg = `📊 **Bot Stats**\n\n👥 Total Users: ${userCount}\n🔒 Instance ID: ${INSTANCE_ID}\n🌐 Portfolio: @SadoMedia_bot`;
@@ -245,7 +245,7 @@ function startBot() {
         const user = msg.from ? `@${msg.from.username || msg.from.first_name}` : 'Unknown';
 
         // Update User info in DB
-        getUser(chatId, {
+        await getUser(chatId, {
             username: msg.from?.username || '',
             first_name: msg.from?.first_name || '',
             last_name: msg.from?.last_name || ''
@@ -255,7 +255,7 @@ function startBot() {
 
         if (!text || text.startsWith('/')) return;
 
-        const lang = getLang(chatId);
+        const lang = await getLang(chatId);
 
         // STRIKE CHECKS (Block Middleware)
         if (isUserBlocked(chatId)) {
@@ -264,8 +264,8 @@ function startBot() {
         }
 
         // --- BROADCAST HANDLING ---
-        if (getUserState(chatId) === STATES.WAITING_BROADCAST && isAdmin(chatId)) {
-            const allUsers = getAllUsers();
+        if (await getUserState(chatId) === STATES.WAITING_BROADCAST && isAdmin(chatId)) {
+            const allUsers = await getAllUsers();
             const userIds = Object.keys(allUsers);
             let sentCount = 0;
             let failCount = 0;
@@ -281,7 +281,7 @@ function startBot() {
                 }
             }
 
-            setUserState(chatId, STATES.MAIN);
+            await setUserState(chatId, STATES.MAIN);
             bot.sendMessage(chatId, `✅ Broadcast yakunlandi.\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`);
             return;
         }
@@ -289,7 +289,7 @@ function startBot() {
         // --- GLOBAL COMMANDS ---
 
         if (text === getText(lang, 'menu_back')) {
-            setUserState(chatId, STATES.MAIN);
+            await setUserState(chatId, STATES.MAIN);
             setRequest(chatId, null);
             bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
             return;
@@ -383,7 +383,7 @@ function startBot() {
     };
 
     async function processUrl(chatId, url, typeContext) {
-        const lang = getLang(chatId);
+        const lang = await getLang(chatId);
         // Immediate feedback so user knows we are working
         const statusMsg = await debugSend(chatId, getText(lang, 'processing'));
 
@@ -445,7 +445,7 @@ function startBot() {
 
         // Update User info on Callback
         if (query.from) {
-            getUser(chatId, {
+            await getUser(chatId, {
                 username: query.from.username || '',
                 first_name: query.from.first_name || '',
                 last_name: query.from.last_name || ''
@@ -454,24 +454,25 @@ function startBot() {
 
         // Always answer immediately to stop the button loading animation
         // Always answer immediately to stop the button loading animation
+        const lang = await getLang(chatId);
         try { await bot.answerCallbackQuery(query.id, { text: getText(lang, 'processing') }); } catch (e) { }
 
 
-        const lang = getLang(chatId);
+        // const lang = getLang(chatId); // Removed as we use await above
 
         // --- ADMIN CALLBACKS ---
         if (data.startsWith('admin_')) {
             if (!isAdmin(chatId)) return;
 
             if (data === 'admin_stats') {
-                const allUsers = getAllUsers();
+                const allUsers = await getAllUsers();
                 const userCount = Object.keys(allUsers).length;
                 bot.sendMessage(chatId, `📊 **Statistika:**\n\nJami foydalanuvchilar: ${userCount}`, { parse_mode: 'Markdown' });
             } else if (data === 'admin_broadcast') {
-                setUserState(chatId, STATES.WAITING_BROADCAST);
+                await setUserState(chatId, STATES.WAITING_BROADCAST);
                 bot.sendMessage(chatId, "📝 **Hamma foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun /admin deb yozing)", { parse_mode: 'Markdown' });
             } else if (data === 'admin_users') {
-                const allUsers = getAllUsers();
+                const allUsers = await getAllUsers();
                 let userList = "👥 **Foydalanuvchilar ro'yxati:**\n\n";
                 const userEntries = Object.entries(allUsers);
 
@@ -491,7 +492,7 @@ function startBot() {
         // --- LANGUAGE SELECTION ---
         if (data.startsWith('lang_')) {
             const selectedLang = data.replace('lang_', '');
-            setLang(chatId, selectedLang);
+            await setLang(chatId, selectedLang);
             bot.sendMessage(chatId, getText(selectedLang, 'welcome'), {
                 parse_mode: 'Markdown',
                 ...getMainMenu(selectedLang)
@@ -565,7 +566,7 @@ function startBot() {
 
         // --- RESET MUSIC ---
         if (data === 'reset_music') {
-            setUserState(chatId, STATES.WAITING_MUSIC);
+            await setUserState(chatId, STATES.WAITING_MUSIC);
             debugSend(chatId, getText(lang, 'prompt_music'), getBackMenu(lang));
             return;
         }
@@ -575,7 +576,7 @@ function startBot() {
             const queryText = data.replace('search_', '');
 
             // Inject into search flow
-            setUserState(chatId, STATES.WAITING_MUSIC);
+            await setUserState(chatId, STATES.WAITING_MUSIC);
             debugSend(chatId, getText(lang, 'searching'));
 
             const stopAction = sendActionLoop(chatId, 'typing'); // Search might take a moment
@@ -652,7 +653,7 @@ function startBot() {
     });
 
     async function handleDownload(chatId, url, type, options, title, customMenu = null, mediaOptions = {}) {
-        const lang = getLang(chatId);
+        const lang = await getLang(chatId);
         try {
             const filePath = await downloadMedia(url, type, options);
 
@@ -705,7 +706,7 @@ function startBot() {
 
     async function handleAudioMessage(msg) {
         const chatId = msg.chat.id;
-        const lang = getLang(chatId);
+        const lang = await getLang(chatId);
         const fileId = msg.voice ? msg.voice.file_id : msg.audio.file_id;
 
         bot.sendChatAction(chatId, 'record_voice');
