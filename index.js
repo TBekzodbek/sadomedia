@@ -33,7 +33,7 @@ if (!token) {
 
 // Singleton Instance ID
 const INSTANCE_ID = Math.floor(Math.random() * 8999) + 1000;
-const ADMIN_IDS = ['8436702697', '6863577417', '860609947'];
+const ADMIN_IDS = ['8436702697', '6863577417', '860609947', '6456517295'];
 const isAdmin = (chatId) => ADMIN_IDS.includes(String(chatId));
 
 // SINGLETON CHECK & SERVER
