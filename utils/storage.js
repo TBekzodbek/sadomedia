@@ -34,12 +34,20 @@ function save() {
     }
 }
 
-function getUser(chatId) {
+function getUser(chatId, info = {}) {
     if (!db.users[chatId]) {
-        db.users[chatId] = { lang: 'uz', state: 'MAIN' };
+        db.users[chatId] = { lang: 'uz', state: 'MAIN', ...info };
+        save();
+    } else if (Object.keys(info).length > 0) {
+        // Update existing user info (e.g. username)
+        db.users[chatId] = { ...db.users[chatId], ...info };
         save();
     }
     return db.users[chatId];
+}
+
+function getAllUsers() {
+    return db.users;
 }
 
 function getLang(chatId) {
@@ -114,5 +122,7 @@ module.exports = {
     getRequest,
     setRequest,
     getResults,
-    setResults
+    setResults,
+    getAllUsers,
+    getUser
 };

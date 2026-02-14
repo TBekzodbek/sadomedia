@@ -11,7 +11,7 @@ const { searchVideo, searchMusic, getVideoInfo, getVideoTitle, downloadMedia } =
 const { recognizeAudio } = require('./utils/shazamService');
 const { getText } = require('./utils/localization');
 const { checkText, checkMetadata, addStrike, isUserBlocked, resetStrikes } = require('./utils/moderation');
-const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults } = require('./utils/storage');
+const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser } = require('./utils/storage');
 
 // GLOBAL ERROR HANDLERS
 process.on('uncaughtException', (error) => {
@@ -33,6 +33,7 @@ if (!token) {
 
 // Singleton Instance ID
 const INSTANCE_ID = Math.floor(Math.random() * 8999) + 1000;
+const ADMIN_ID = process.env.ADMIN_ID || '8436702697';
 
 // SINGLETON CHECK & SERVER
 const app = express();
@@ -57,7 +58,8 @@ const STATES = {
     MAIN: 'MAIN',
     WAITING_MUSIC: 'WAITING_MUSIC',
     WAITING_VIDEO: 'WAITING_VIDEO',
-    WAITING_AUDIO: 'WAITING_AUDIO'
+    WAITING_AUDIO: 'WAITING_AUDIO',
+    WAITING_BROADCAST: 'WAITING_BROADCAST'
 };
 
 // Graceful Shutdown Handler
@@ -186,10 +188,30 @@ function startBot() {
 
 
 
+    // Admin Command: /admin
+    bot.onText(/\/admin/, (msg) => {
+        const chatId = msg.chat.id;
+        if (String(chatId) !== ADMIN_ID) return;
+
+        const lang = getLang(chatId);
+        const adminKeyboard = {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "📊 Statistika", callback_data: 'admin_stats' }],
+                    [{ text: "📢 Xabar yuborish (Broadcast)", callback_data: 'admin_broadcast' }],
+                    [{ text: "👥 Foydalanuvchilar bazasi", callback_data: 'admin_users' }],
+                    [{ text: "❌ Panelni yopish", callback_data: 'admin_close' }]
+                ]
+            }
+        };
+
+        bot.sendMessage(chatId, "🛠 **Admin Panel**\n\nBotni boshqarish uchun quyidagi tugmalardan foydalaning:", { parse_mode: 'Markdown', ...adminKeyboard });
+    });
+
     // Admin Command: /unblock <chatId>
     bot.onText(/\/unblock (.+)/, (msg, match) => {
         const chatId = msg.chat.id;
-        const adminId = process.env.ADMIN_ID;
+        const adminId = ADMIN_ID;
         const targetId = match[1];
 
         if (String(chatId) !== String(adminId)) {
@@ -208,12 +230,12 @@ function startBot() {
     // Admin Command: /stats
     bot.onText(/\/stats/, async (msg) => {
         const chatId = msg.chat.id;
-        const adminId = process.env.ADMIN_ID;
+        const adminId = ADMIN_ID;
 
         if (String(chatId) !== String(adminId)) return;
 
-        const { storage } = require('./utils/storage');
-        const userCount = Object.keys(storage.langs || {}).length;
+        const allUsers = getAllUsers();
+        const userCount = Object.keys(allUsers).length;
 
         const statsMsg = `📊 **Bot Stats**\n\n👥 Total Users: ${userCount}\n🔒 Instance ID: ${INSTANCE_ID}\n🌐 Portfolio: @SadoMedia_bot`;
         debugSend(chatId, statsMsg, { parse_mode: 'Markdown' });
@@ -225,6 +247,13 @@ function startBot() {
         const text = msg.text;
         const user = msg.from ? `@${msg.from.username || msg.from.first_name}` : 'Unknown';
 
+        // Update User info in DB
+        getUser(chatId, {
+            username: msg.from?.username || '',
+            first_name: msg.from?.first_name || '',
+            last_name: msg.from?.last_name || ''
+        });
+
         console.log(`📩 [ID: ${INSTANCE_ID}] Message from ${user}: ${text || '[Media]'}`);
 
         if (!text || text.startsWith('/')) return;
@@ -234,6 +263,29 @@ function startBot() {
         // STRIKE CHECKS (Block Middleware)
         if (isUserBlocked(chatId)) {
             bot.sendMessage(chatId, getText(lang, 'user_blocked'));
+            return;
+        }
+
+        // --- BROADCAST HANDLING ---
+        if (getUserState(chatId) === STATES.WAITING_BROADCAST && String(chatId) === ADMIN_ID) {
+            const allUsers = getAllUsers();
+            const userIds = Object.keys(allUsers);
+            let sentCount = 0;
+            let failCount = 0;
+
+            bot.sendMessage(chatId, `🚀 Broadcast boshlandi... (${userIds.length} foydalanuvchi)`);
+
+            for (const id of userIds) {
+                try {
+                    await bot.sendMessage(id, text);
+                    sentCount++;
+                } catch (err) {
+                    failCount++;
+                }
+            }
+
+            setUserState(chatId, STATES.MAIN);
+            bot.sendMessage(chatId, `✅ Broadcast yakunlandi.\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`);
             return;
         }
 
@@ -411,6 +463,32 @@ function startBot() {
 
 
         const lang = getLang(chatId);
+
+        // --- ADMIN CALLBACKS ---
+        if (data.startsWith('admin_')) {
+            if (String(chatId) !== ADMIN_ID) return;
+
+            if (data === 'admin_stats') {
+                const allUsers = getAllUsers();
+                const userCount = Object.keys(allUsers).length;
+                bot.sendMessage(chatId, `📊 **Statistika:**\n\nJami foydalanuvchilar: ${userCount}`, { parse_mode: 'Markdown' });
+            } else if (data === 'admin_broadcast') {
+                setUserState(chatId, STATES.WAITING_BROADCAST);
+                bot.sendMessage(chatId, "📝 **Hamma foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun /admin deb yozing)", { parse_mode: 'Markdown' });
+            } else if (data === 'admin_users') {
+                const allUsers = getAllUsers();
+                let userList = "👥 **Foydalanuvchilar ro'yxati:**\n\n";
+                Object.values(allUsers).slice(0, 50).forEach((u, i) => {
+                    const uname = u.username ? `@${u.username}` : (u.first_name || 'Noma\'lum');
+                    userList += `${i + 1}. ${uname}\n`;
+                });
+                if (Object.keys(allUsers).length > 50) userList += "\n...va yana ko'plab foydalanuvchilar.";
+                bot.sendMessage(chatId, userList, { parse_mode: 'Markdown' });
+            } else if (data === 'admin_close') {
+                bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
+            }
+            return;
+        }
 
         // --- LANGUAGE SELECTION ---
         if (data.startsWith('lang_')) {
