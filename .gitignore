@@ -1,0 +1,8 @@
+node_modules
+downloads
+
+.DS_Store
+*.log
+*.exe
+bin/
+data/
