@@ -33,7 +33,8 @@ if (!token) {
 
 // Singleton Instance ID
 const INSTANCE_ID = Math.floor(Math.random() * 8999) + 1000;
-const ADMIN_ID = process.env.ADMIN_ID || '8436702697';
+const ADMIN_IDS = ['8436702697', '6863577417'];
+const isAdmin = (chatId) => ADMIN_IDS.includes(String(chatId));
 
 // SINGLETON CHECK & SERVER
 const app = express();
@@ -117,11 +118,10 @@ function startBot() {
         console.log(`✅ [ID: ${INSTANCE_ID}] Bot muvaffaqiyatli ulandi! Username: @${botUsername}`);
         console.log(`📡 [ID: ${INSTANCE_ID}] Polling boshlandi...`);
 
-        // Notify Admin on startup
-        const adminId = process.env.ADMIN_ID;
-        if (adminId) {
+        // Notify Admins on startup
+        ADMIN_IDS.forEach(adminId => {
             bot.sendMessage(adminId, `🚀 **Bot Ishga Tushdi!**\n\n📌 **Instance ID:** ${INSTANCE_ID}\n🤖 **Bot:** @${me.username}\n🔄 **Hozirgi holat:** Polling boshlandi.`, { parse_mode: 'Markdown' }).catch(() => { });
-        }
+        });
     }).catch(err => {
         console.error(`❌ [ID: ${INSTANCE_ID}] Bot ulanishda xatolik:`, err.message);
     });
@@ -191,7 +191,7 @@ function startBot() {
     // Admin Command: /admin
     bot.onText(/\/admin/, (msg) => {
         const chatId = msg.chat.id;
-        if (String(chatId) !== ADMIN_ID) return;
+        if (!isAdmin(chatId)) return;
 
         const lang = getLang(chatId);
         const adminKeyboard = {
@@ -211,10 +211,9 @@ function startBot() {
     // Admin Command: /unblock <chatId>
     bot.onText(/\/unblock (.+)/, (msg, match) => {
         const chatId = msg.chat.id;
-        const adminId = ADMIN_ID;
         const targetId = match[1];
 
-        if (String(chatId) !== String(adminId)) {
+        if (!isAdmin(chatId)) {
             return; // Ignore non-admins
         }
 
@@ -230,9 +229,8 @@ function startBot() {
     // Admin Command: /stats
     bot.onText(/\/stats/, async (msg) => {
         const chatId = msg.chat.id;
-        const adminId = ADMIN_ID;
 
-        if (String(chatId) !== String(adminId)) return;
+        if (!isAdmin(chatId)) return;
 
         const allUsers = getAllUsers();
         const userCount = Object.keys(allUsers).length;
@@ -267,7 +265,7 @@ function startBot() {
         }
 
         // --- BROADCAST HANDLING ---
-        if (getUserState(chatId) === STATES.WAITING_BROADCAST && String(chatId) === ADMIN_ID) {
+        if (getUserState(chatId) === STATES.WAITING_BROADCAST && isAdmin(chatId)) {
             const allUsers = getAllUsers();
             const userIds = Object.keys(allUsers);
             let sentCount = 0;
@@ -466,7 +464,7 @@ function startBot() {
 
         // --- ADMIN CALLBACKS ---
         if (data.startsWith('admin_')) {
-            if (String(chatId) !== ADMIN_ID) return;
+            if (!isAdmin(chatId)) return;
 
             if (data === 'admin_stats') {
                 const allUsers = getAllUsers();
