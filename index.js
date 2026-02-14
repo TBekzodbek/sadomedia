@@ -443,6 +443,15 @@ function startBot() {
         const chatId = query.message.chat.id;
         const data = query.data;
 
+        // Update User info on Callback
+        if (query.from) {
+            getUser(chatId, {
+                username: query.from.username || '',
+                first_name: query.from.first_name || '',
+                last_name: query.from.last_name || ''
+            });
+        }
+
         // Always answer immediately to stop the button loading animation
         // Always answer immediately to stop the button loading animation
         try { await bot.answerCallbackQuery(query.id, { text: getText(lang, 'processing') }); } catch (e) { }
@@ -464,11 +473,14 @@ function startBot() {
             } else if (data === 'admin_users') {
                 const allUsers = getAllUsers();
                 let userList = "👥 **Foydalanuvchilar ro'yxati:**\n\n";
-                Object.values(allUsers).slice(0, 50).forEach((u, i) => {
+                const userEntries = Object.entries(allUsers);
+
+                userEntries.slice(0, 50).forEach(([id, u], i) => {
                     const uname = u.username ? `@${u.username}` : (u.first_name || 'Noma\'lum');
-                    userList += `${i + 1}. ${uname}\n`;
+                    userList += `${i + 1}. [${id}] ${uname}\n`;
                 });
-                if (Object.keys(allUsers).length > 50) userList += "\n...va yana ko'plab foydalanuvchilar.";
+
+                if (userEntries.length > 50) userList += "\n...va yana ko'plab foydalanuvchilar.";
                 bot.sendMessage(chatId, userList, { parse_mode: 'Markdown' });
             } else if (data === 'admin_close') {
                 bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
