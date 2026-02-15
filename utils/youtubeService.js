@@ -49,6 +49,26 @@ function getBaseOptions() {
     return opts;
 }
 
+// Helper to clean URL from playlist parameters
+function cleanUrl(url) {
+    if (!url) return url;
+    try {
+        const u = new URL(url);
+        if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+            // Remove 'list' param but keep other important ones like 'v'
+            if (u.searchParams.has('list')) {
+                u.searchParams.delete('list');
+                // Also remove index if it exists
+                u.searchParams.delete('index');
+            }
+            return u.toString();
+        }
+    } catch (e) {
+        // Fallback to original if URL parsing fails
+    }
+    return url;
+}
+
 async function searchVideo(query, limit = 5) {
     const cacheKey = `search:${query}:${limit}`;
     const cached = cache.get(cacheKey);
@@ -97,6 +117,7 @@ async function searchMusic(query, limit = 50) {
 }
 
 async function getVideoInfo(url) {
+    url = cleanUrl(url);
     const cacheKey = `info:${url}`;
     const cached = cache.get(cacheKey);
     if (cached) return cached;
@@ -110,6 +131,7 @@ async function getVideoInfo(url) {
             const flags = {
                 dumpSingleJson: true,
                 noWarnings: true,
+                noPlaylist: true,
                 forceIpv4: true,
                 noCheckCertificates: true,
                 geoBypass: true,
@@ -171,6 +193,7 @@ async function getVideoTitle(url) {
 }
 
 async function downloadMedia(url, type, options = {}) {
+    url = cleanUrl(url);
     const { outputPath, height } = options;
 
     let flags = {
@@ -200,10 +223,11 @@ async function downloadMedia(url, type, options = {}) {
         let formatSelect;
 
         if (isYouTube) {
-            // Priority: MP4 720p > MP4 Any Height > Best Video+Audio > Best Overall
+            // Priority: MP4 720p > Any MP4 up to 720p > Best Video+Audio > Best Overall
+            // Using ? to make constraints optional for better fallback
             formatSelect = isNumericHeight
                 ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best`
-                : 'best[height<=720][ext=mp4]/best[ext=mp4]/bestvideo[height<=720]+bestaudio/best';
+                : 'best[height<=?720][ext=mp4]/best[ext=mp4]/bestvideo[height<=?720]+bestaudio/best';
         } else {
             formatSelect = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
         }
