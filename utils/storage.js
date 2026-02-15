@@ -1,3 +1,5 @@
+const path = require('path');
+const fs = require('fs-extra');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
@@ -132,7 +134,7 @@ function setBroadcastContent(chatId, data) {
 }
 
 const BROADCAST_FILE = path.join(__dirname, '../data/last_broadcast.json');
-const fs = require('fs-extra');
+
 
 async function saveBroadcast(content, recipients) {
     try {
