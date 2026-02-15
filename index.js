@@ -147,14 +147,19 @@ function startBot() {
         return bot.sendMessage(chatId, text, options);
     };
 
-    const getMainMenu = (lang) => ({
-        reply_markup: {
-            keyboard: [
-                [{ text: getText(lang, 'menu_share') }]
-            ],
-            resize_keyboard: true
-        }
-    });
+    const getMainMenu = (lang) => {
+        const keyboard = [];
+        keyboard.push([{ text: getText(lang, 'menu_music') }, { text: getText(lang, 'menu_video') }]);
+        keyboard.push([{ text: getText(lang, 'menu_audio') }, { text: getText(lang, 'menu_help') }]);
+        keyboard.push([{ text: getText(lang, 'menu_lang') }, { text: getText(lang, 'menu_share') }]);
+        
+        return {
+            reply_markup: {
+                keyboard: keyboard,
+                resize_keyboard: true
+            }
+        };
+    };
 
     const getBackMenu = (lang) => ({
         reply_markup: {
@@ -282,7 +287,43 @@ function startBot() {
             }
 
             await setUserState(chatId, STATES.MAIN);
-            bot.sendMessage(chatId, `✅ Broadcast yakunlandi.\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`);
+            bot.sendMessage(chatId, `✅ Broadcast yakunlandi.\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`, getMainMenu(lang));
+            return;
+        }
+
+        // --- MENU COMMANDS ---
+        if (text === getText(lang, 'menu_music')) {
+            await setUserState(chatId, STATES.WAITING_MUSIC);
+            bot.sendMessage(chatId, getText(lang, 'prompt_music'), getBackMenu(lang));
+            return;
+        }
+
+        if (text === getText(lang, 'menu_video')) {
+            await setUserState(chatId, STATES.WAITING_VIDEO);
+            bot.sendMessage(chatId, getText(lang, 'prompt_video'), getBackMenu(lang));
+            return;
+        }
+
+        if (text === getText(lang, 'menu_audio')) {
+            await setUserState(chatId, STATES.WAITING_AUDIO);
+            bot.sendMessage(chatId, getText(lang, 'prompt_audio'), getBackMenu(lang));
+            return;
+        }
+
+        if (text === getText(lang, 'menu_help')) {
+            bot.sendMessage(chatId, getText(lang, 'help_text'), getMainMenu(lang));
+            return;
+        }
+
+        if (text === getText(lang, 'menu_lang')) {
+            bot.sendMessage(chatId, "🌐 Tilni tanlang / Выберите язык / Select language:", {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: "🇺🇿 O'zbekcha", callback_data: 'lang_uz' }, { text: "🇺🇿 Ўзбекча (Кирилл)", callback_data: 'lang_uz_cyrl' }],
+                        [{ text: "🇷🇺 Русский", callback_data: 'lang_ru' }, { text: "🇬🇧 English", callback_data: 'lang_en' }]
+                    ]
+                }
+            });
             return;
         }
 
@@ -295,7 +336,7 @@ function startBot() {
             return;
         }
 
-        if (text.includes("Botni ulashish") || text.includes("Поделиться") || text.includes("Share Bot") || text.includes("Ботни улашиш")) {
+        if (text === getText(lang, 'menu_share')) {
             const shareText = getText(lang, 'share_text').replace('{username}', botUsername);
             const shareLink = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${encodeURIComponent(getText(lang, 'share_text').replace('{username}', botUsername))}`;
 
@@ -473,16 +514,38 @@ function startBot() {
                 bot.sendMessage(chatId, "📝 **Hamma foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun /admin deb yozing)", { parse_mode: 'Markdown' });
             } else if (data === 'admin_users') {
                 const allUsers = await getAllUsers();
-                let userList = "👥 **Foydalanuvchilar ro'yxati:**\n\n";
                 const userEntries = Object.entries(allUsers);
 
-                userEntries.slice(0, 50).forEach(([id, u], i) => {
-                    const uname = u.username ? `@${u.username}` : (u.first_name || 'Noma\'lum');
-                    userList += `${i + 1}. [${id}] ${uname}\n`;
-                });
+                if (userEntries.length === 0) {
+                    bot.sendMessage(chatId, "⚠️ **Foydalanuvchilar bazasi hozircha bo'sh.**\nBotdan foydalanuvchilar ko'payishi bilan bu yerda paydo bo'ladi.", { parse_mode: 'Markdown' });
+                } else {
+                    let userList = "👥 **Foydalanuvchilar ro'yxati:**\n\n";
+                    userEntries.slice(0, 50).forEach(([id, u], i) => {
+                        // Safe extraction of properties
+                        const uname = u.username || '';
+                        const fname = u.first_name || '';
+                        const lname = u.last_name || '';
 
-                if (userEntries.length > 50) userList += "\n...va yana ko'plab foydalanuvchilar.";
-                bot.sendMessage(chatId, userList, { parse_mode: 'Markdown' });
+                        // Combine names and escape markdown
+                        let displayName = (fname + ' ' + lname).trim();
+                        if (!displayName) displayName = 'Noma\'lum';
+                        
+                        // Clean for MarkdownV2/Stable Markdown
+                        const safeName = displayName.replace(/[_*`[\]()]/g, '\\$&');
+                        const safeUname = uname ? ` (@${uname.replace(/[_*`[\]()]/g, '\\$&')})` : '';
+
+                        userList += `${i + 1}. \`${id}\` ${safeName}${safeUname}\n`;
+                    });
+
+                    if (userEntries.length > 50) userList += "\n...va yana ko'plab foydalanuvchilar.";
+                    
+                    try {
+                        await bot.sendMessage(chatId, userList, { parse_mode: 'Markdown' });
+                    } catch (sendErr) {
+                        console.error('Failed to send user list:', sendErr);
+                        bot.sendMessage(chatId, "❌ **Xatolik:** Foydalanuvchilar ro'yxatini yuborib bo'lmadi. Ma'lumot juda ko'p yoki formatlashda xato bor.");
+                    }
+                }
             } else if (data === 'admin_close') {
                 bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
             }

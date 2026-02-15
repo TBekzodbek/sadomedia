@@ -6,3 +6,6 @@ downloads
 *.exe
 bin/
 data/
+.env
+verify_supabase.js
+downloads/
