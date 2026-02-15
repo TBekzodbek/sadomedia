@@ -110,7 +110,6 @@ async function getVideoInfo(url) {
             const flags = {
                 dumpSingleJson: true,
                 noWarnings: true,
-                preferFreeFormats: true,
                 forceIpv4: true,
                 noCheckCertificates: true,
                 geoBypass: true,
@@ -176,11 +175,12 @@ async function downloadMedia(url, type, options = {}) {
         let formatSelect;
 
         if (isYouTube) {
+            // Prioritize 720p or Best MP4, but fallback to anything if unavailable
             formatSelect = isNumericHeight
-                ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best`
-                : 'best[ext=mp4]/best';
+                ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best`
+                : 'best[height<=720][ext=mp4]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
         } else {
-            formatSelect = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+            formatSelect = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
         }
 
         Object.assign(flags, {
