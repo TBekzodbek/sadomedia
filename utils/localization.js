@@ -44,7 +44,7 @@ const TEXTS = {
         user_blocked: "🚫 **Siz bloklandingiz.**\nBotdan foydalanish qoidalari buzilgani sababli cheklov qo'yildi.",
 
         menu_share: "📣 Botni ulashish",
-        share_text: "🚀 **SadoMedia Bot** - Eng tezkor YouTube va Music yuklovchi bot!\n\nBotni bu yerda topishingiz mumkin: @{username}",
+        share_text: "🚀 **SadoMedia Bot** - YouTube, Instagram, TikTok dan video yuklash va musiqalar topish uchun eng yaxshi yordamchingiz!\n\nBotni bu yerda topishingiz mumkin: @{username}",
         btn_share: "📲 Ulashish"
     },
     uz_cyrl: {
@@ -92,7 +92,7 @@ const TEXTS = {
         user_blocked: "🚫 **Сиз блокландингиз.**\nБотдан фойдаланиш қоидалари бузилгани сабабли чеклов қўйилди.",
 
         menu_share: "📣 Ботни улашиш",
-        share_text: "🚀 **SadoMedia Bot** - Энг тезкор YouTube ва Music юкловчи бот!\n\nБотни бу ерда топишингиз мумкин: @{username}",
+        share_text: "🚀 **SadoMedia Bot** - YouTube, Instagram, TikTok дан видео юклаш ва мусиқалар топиш учун энг яхши ёрдамчингиз!\n\nБотни бу ерда топишингиз мумкин: @{username}",
         btn_share: "📲 Улашиш"
     },
     ru: {
@@ -140,7 +140,7 @@ const TEXTS = {
         user_blocked: "🚫 **Вы заблокированы.**\nДоступ ограничен из-за нарушения правил использования бота.",
 
         menu_share: "📣 Поделиться ботом",
-        share_text: "🚀 **SadoMedia Bot** - Самый быстрый бот для скачивания с YouTube и музыки!\n\nВы можете найти бота здесь: @{username}",
+        share_text: "🚀 **SadoMedia Bot** - Ваш лучший помощник для скачивания видео из YouTube, Instagram, TikTok и поиска музыки!\n\nВы можете найти бота здесь: @{username}",
         btn_share: "📲 Поделиться"
     },
     en: {
@@ -188,7 +188,7 @@ const TEXTS = {
         user_blocked: "🚫 **You have been blocked.**\nAccess is restricted due to violation of bot usage rules.",
 
         menu_share: "📣 Share Bot",
-        share_text: "🚀 **SadoMedia Bot** - The fastest YouTube and Music downloader bot!\n\nYou can find the bot here: @{username}",
+        share_text: "🚀 **SadoMedia Bot** - Your best assistant for downloading videos from YouTube, Instagram, TikTok and finding music!\n\nYou can find the bot here: @{username}",
         btn_share: "📲 Share"
     }
 };

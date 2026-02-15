@@ -120,8 +120,9 @@ function startBot() {
         console.log(`📡 [ID: ${INSTANCE_ID}] Polling boshlandi...`);
 
         // Notify Admins on startup
+        const escapedMeUsername = me.username.replace(/_/g, '\\_');
         ADMIN_IDS.forEach(adminId => {
-            bot.sendMessage(adminId, `🚀 **Bot Ishga Tushdi!**\n\n📌 **Instance ID:** ${INSTANCE_ID}\n🤖 **Bot:** @${me.username}\n🔄 **Hozirgi holat:** Polling boshlandi.`, { parse_mode: 'Markdown' }).catch(() => { });
+            bot.sendMessage(adminId, `🚀 **Bot Ishga Tushdi!**\n\n📌 **Instance ID:** ${INSTANCE_ID}\n🤖 **Bot:** @${escapedMeUsername}\n🔄 **Hozirgi holat:** Polling boshlandi.`, { parse_mode: 'Markdown' }).catch(() => { });
         });
     }).catch(err => {
         console.error(`❌ [ID: ${INSTANCE_ID}] Bot ulanishda xatolik:`, err.message);
@@ -248,7 +249,8 @@ function startBot() {
         const allUsers = await getAllUsers();
         const userCount = Object.keys(allUsers).length;
 
-        const statsMsg = `📊 **Bot Stats**\n\n👥 Total Users: ${userCount}\n🔒 Instance ID: ${INSTANCE_ID}\n🌐 Portfolio: @SadoMedia_bot`;
+        const escapedBotUsername = botUsername.replace(/_/g, '\\_');
+        const statsMsg = `📊 **Bot Stats**\n\n👥 Total Users: ${userCount}\n🔒 Instance ID: ${INSTANCE_ID}\n🌐 Portfolio: @${escapedBotUsername}`;
         debugSend(chatId, statsMsg, { parse_mode: 'Markdown' });
     });
 
@@ -355,8 +357,16 @@ function startBot() {
         }
 
         if (isCommand(text, 'menu_share')) {
-            const shareText = getText(lang, 'share_text').replace('{username}', botUsername);
-            const shareLink = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${encodeURIComponent(getText(lang, 'share_text').replace('{username}', botUsername))}`;
+            const escapedUsername = botUsername.replace(/_/g, '\\_');
+            const shareText = getText(lang, 'share_text').replace('{username}', escapedUsername);
+
+            // Clean text for the URL (remove markdown symbols)
+            const cleanShareText = getText(lang, 'share_text')
+                .replace('{username}', botUsername)
+                .replace(/\*\*/g, '')
+                .replace(/__/g, '');
+
+            const shareLink = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${encodeURIComponent(cleanShareText)}`;
 
             bot.sendMessage(chatId, shareText, {
                 parse_mode: 'Markdown',
@@ -887,7 +897,8 @@ function startBot() {
 
             if (track) {
                 const { title, artist, album, year } = track;
-                const caption = `${getText(lang, 'shazam_found')}\n\n**${getText(lang, 'label_artist')}:** ${artist}\n**${getText(lang, 'label_title')}:** ${title}\n**${getText(lang, 'label_album')}:** ${album || '-'}\n**${getText(lang, 'label_year')}:** ${year || '-'}`;
+                const esc = (text) => (text || '').replace(/[_*`[\]()]/g, '\\$&');
+                const caption = `${getText(lang, 'shazam_found')}\n\n**${getText(lang, 'label_artist')}:** ${esc(artist)}\n**${getText(lang, 'label_title')}:** ${esc(title)}\n**${getText(lang, 'label_album')}:** ${esc(album)}\n**${getText(lang, 'label_year')}:** ${esc(year)}`;
 
                 await debugSend(chatId, caption, {
                     parse_mode: 'Markdown',
