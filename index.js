@@ -107,8 +107,15 @@ function startBot() {
     }
 
     bot.on('polling_error', (error) => {
-        if (error.code === 'ETELEGRAM' && error.message.includes('Conflict')) {
-            console.error(`⚠️ [ID: ${INSTANCE_ID}] Polling Conflict: Boshqa bot instance ishlab turibdi! Iltimos, boshqa botlarni o'chiring.`);
+        if (error.code === 'ETELEGRAM' && error.message.includes('409 Conflict')) {
+            console.error(`⚠️ [ID: ${INSTANCE_ID}] Polling Conflict: Boshqa bot instance ishga tushdi.`);
+            console.error('Bu nusxa (older instance) avtomatik yopilmoqda...');
+
+            bot.stopPolling().then(() => {
+                server.close(() => {
+                    process.exit(0);
+                });
+            }).catch(() => process.exit(1));
         } else {
             console.error(`⚠️ [ID: ${INSTANCE_ID}] Polling Error:`, error.message);
         }
