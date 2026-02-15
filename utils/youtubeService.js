@@ -8,9 +8,46 @@ const cache = new NodeCache({ stdTTL: 3600 });
 
 // Configuration constants
 const isWin = process.platform === 'win32';
-const YOUTUBE_DL_BINARY = isWin ? path.join(__dirname, '../yt-dlp.exe') : 'yt-dlp';
+const rootBin = path.join(__dirname, '../yt-dlp.exe');
+const packageBin = path.join(__dirname, '../node_modules/youtube-dl-exec/bin/yt-dlp.exe');
+
+// Detection for yt-dlp binary
+// On Windows: root > package > PATH
+// On Linux: 'yt-dlp'
+const YOUTUBE_DL_BINARY = isWin
+    ? (fs.existsSync(rootBin) ? rootBin : (fs.existsSync(packageBin) ? packageBin : 'yt-dlp'))
+    : 'yt-dlp';
+
 const FFMPEG_LOCATION = path.join(__dirname, '../bin');
 const COOKIES_PATH = path.join(__dirname, '../cookies.txt');
+
+console.log(`📡 [youtubeService] Using binary: ${YOUTUBE_DL_BINARY}`);
+
+// Helper for youtubedl options to avoid repetition
+function getBaseOptions() {
+    const env = { ...process.env };
+    // On Windows, the environment variable is 'Path' (case-sensitive in Node.js env object)
+    const pathKey = isWin ? 'Path' : 'PATH';
+    const separator = isWin ? ';' : ':';
+
+    if (env[pathKey]) {
+        env[pathKey] = `${FFMPEG_LOCATION}${separator}${env[pathKey]}`;
+    } else {
+        env[pathKey] = FFMPEG_LOCATION;
+    }
+
+    const opts = {
+        env,
+        timeout: 45000, // 45 seconds timeout to prevent hanging
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    };
+
+    if (YOUTUBE_DL_BINARY && YOUTUBE_DL_BINARY !== 'yt-dlp') {
+        opts.youtubeDlBinary = YOUTUBE_DL_BINARY;
+    }
+
+    return opts;
+}
 
 async function searchVideo(query, limit = 5) {
     const cacheKey = `search:${query}:${limit}`;
@@ -18,19 +55,17 @@ async function searchVideo(query, limit = 5) {
     if (cached) return cached;
 
     try {
-        const output = await youtubedl(`ytsearch${limit}:${query}`, {
+        const flags = {
             dumpSingleJson: true,
             noWarnings: true,
             preferFreeFormats: true,
             flatPlaylist: true,
-            ffmpegLocation: FFMPEG_LOCATION,
             forceIpv4: true,
-            cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined
-        }, {
-            youtubeDlBinary: YOUTUBE_DL_BINARY,
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-        });
+            cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
+            ffmpegLocation: FFMPEG_LOCATION
+        };
 
+        const output = await youtubedl(`ytsearch${limit}:${query}`, flags, getBaseOptions());
         cache.set(cacheKey, output);
         return output;
     } catch (e) {
@@ -44,18 +79,16 @@ async function searchMusic(query, limit = 50) {
     if (cached) return cached;
 
     try {
-        const output = await youtubedl(`ytsearch${limit}:${query}`, {
+        const flags = {
             dumpSingleJson: true,
             noWarnings: true,
             flatPlaylist: true,
-            ffmpegLocation: FFMPEG_LOCATION,
             forceIpv4: true,
-            cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined
-        }, {
-            youtubeDlBinary: YOUTUBE_DL_BINARY,
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-        });
+            cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
+            ffmpegLocation: FFMPEG_LOCATION
+        };
 
+        const output = await youtubedl(`ytsearch${limit}:${query}`, flags, getBaseOptions());
         cache.set(cacheKey, output);
         return output;
     } catch (e) {
@@ -73,28 +106,25 @@ async function getVideoInfo(url) {
 
     for (const client of clients) {
         try {
-            console.log(`🔎 Fetching metadata via client: ${client}...`);
+            console.log(`🔎 [youtubeService] Fetching metadata via client: ${client}...`);
             const flags = {
                 dumpSingleJson: true,
                 noWarnings: true,
                 noCallHome: true,
                 preferFreeFormats: true,
                 youtubeSkipDashManifest: true,
-                ffmpegLocation: FFMPEG_LOCATION,
                 forceIpv4: true,
                 noCheckCertificates: true,
                 geoBypass: true,
-                cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined
+                cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
+                ffmpegLocation: FFMPEG_LOCATION
             };
 
             if (isYouTube && client !== 'default') {
                 flags.extractorArgs = `youtube:player_client=${client}`;
             }
 
-            const info = await youtubedl(url, flags, {
-                youtubeDlBinary: YOUTUBE_DL_BINARY,
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-            });
+            const info = await youtubedl(url, flags, getBaseOptions());
 
             if (info && !info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
                 info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
@@ -103,15 +133,19 @@ async function getVideoInfo(url) {
             cache.set(cacheKey, info, 300);
             return info;
         } catch (e) {
-            console.log(`⚠️ Metadata fetch failed for ${client}: ${e.message}`);
+            console.warn(`⚠️ [youtubeService] Metadata fetch failed for ${client}: ${e.message}`);
         }
     }
     throw new Error('Could not fetch video metadata.');
 }
 
 async function getVideoTitle(url) {
-    const info = await getVideoInfo(url);
-    return info.title;
+    try {
+        const info = await getVideoInfo(url);
+        return info ? info.title : 'Video';
+    } catch (e) {
+        return 'Video';
+    }
 }
 
 async function downloadMedia(url, type, options = {}) {
@@ -120,7 +154,6 @@ async function downloadMedia(url, type, options = {}) {
     let flags = {
         output: outputPath,
         noPlaylist: true,
-        ffmpegLocation: FFMPEG_LOCATION,
         noWarnings: true,
         noColors: true,
         noProgress: true,
@@ -129,6 +162,8 @@ async function downloadMedia(url, type, options = {}) {
         noMtime: true,
         noCheckCertificates: true,
         geoBypass: true,
+        cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
+        ffmpegLocation: FFMPEG_LOCATION
     };
 
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
@@ -147,7 +182,6 @@ async function downloadMedia(url, type, options = {}) {
                 ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best`
                 : 'best[ext=mp4]/best';
         } else {
-            // Social Media platforms (Instagram, TikTok, etc.)
             formatSelect = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
         }
 
@@ -162,17 +196,17 @@ async function downloadMedia(url, type, options = {}) {
 
     for (const client of clients) {
         try {
-            console.log(`📡 Attempting download with client: ${client}...`);
+            console.log(`📡 [youtubeService] Attempting download with client: ${client}...`);
             const currentFlags = { ...flags };
             if (isYouTube && client !== 'default') {
                 currentFlags.extractorArgs = `youtube:player_client=${client}`;
             }
 
-            const result = await youtubedl(url, currentFlags, {
-                youtubeDlBinary: YOUTUBE_DL_BINARY,
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined
-            });
+            // Using longer timeout for actual downloads
+            const downloadOpts = getBaseOptions();
+            downloadOpts.timeout = 300000; // 5 minutes for download
+
+            const result = await youtubedl(url, currentFlags, downloadOpts);
 
             // Extract path from stdout if possible
             const stdout = (typeof result === 'string') ? result : (result.stdout || '');
@@ -185,7 +219,6 @@ async function downloadMedia(url, type, options = {}) {
                 if (fs.existsSync(foundPath)) return foundPath;
             }
 
-            // Fallback: check the expected output path with different extensions
             const base = outputPath.replace('.%(ext)s', '');
             const extensions = type === 'audio' ? ['.mp3', '.m4a'] : ['.mp4', '.mkv', '.webm'];
             for (const ext of extensions) {
@@ -193,18 +226,18 @@ async function downloadMedia(url, type, options = {}) {
                 if (fs.existsSync(fallbackPath)) return fallbackPath;
             }
         } catch (e) {
-            console.log(`⚠️ Client ${client} download failed: ${e.message}`);
+            console.warn(`⚠️ [youtubeService] Client ${client} download failed: ${e.message}`);
             lastError = e;
         }
     }
 
     // FINAL FALLBACK: Simplest download
     try {
-        console.log('🔄 All clients failed or path error. Trying final fallback...');
-        await youtubedl(url, { ...flags, format: 'best' }, {
-            youtubeDlBinary: YOUTUBE_DL_BINARY,
-            cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined
-        });
+        console.log('🔄 [youtubeService] All clients failed or path error. Trying final fallback...');
+        const fallbackOpts = getBaseOptions();
+        fallbackOpts.timeout = 300000;
+
+        await youtubedl(url, { ...flags, format: 'best' }, fallbackOpts);
 
         const base = outputPath.replace('.%(ext)s', '');
         const exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv'];

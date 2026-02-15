@@ -17,10 +17,19 @@ async function setup() {
     const ffprobeDest = path.join(BIN_DIR, ffprobeName);
 
     console.log(`Copying ffmpeg from ${ffmpegPath} to ${ffmpegDest}`);
-    await fs.copy(ffmpegPath, ffmpegDest, { overwrite: true });
+    if (isWin) {
+        // Use native shell copy for Windows to avoid stream issues if any
+        require('child_process').execSync(`copy /Y "${ffmpegPath}" "${ffmpegDest}"`);
+    } else {
+        await fs.copy(ffmpegPath, ffmpegDest, { overwrite: true });
+    }
 
     console.log(`Copying ffprobe from ${ffprobePath} to ${ffprobeDest}`);
-    await fs.copy(ffprobePath, ffprobeDest, { overwrite: true });
+    if (isWin) {
+        require('child_process').execSync(`copy /Y "${ffprobePath}" "${ffprobeDest}"`);
+    } else {
+        await fs.copy(ffprobePath, ffprobeDest, { overwrite: true });
+    }
 
     // On Linux/Mac, ensure they are executable
     if (!isWin) {
