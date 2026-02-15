@@ -118,6 +118,33 @@ function setResults(chatId, data) {
     }
 }
 
+const BROADCAST_FILE = path.join(__dirname, '../data/last_broadcast.json');
+const fs = require('fs-extra');
+
+async function saveBroadcast(content, recipients) {
+    try {
+        await fs.ensureDir(path.dirname(BROADCAST_FILE));
+        await fs.writeJson(BROADCAST_FILE, {
+            content,
+            recipients, // Array of { chatId, messageId }
+            timestamp: new Date()
+        });
+    } catch (error) {
+        console.error('Error saving broadcast:', error);
+    }
+}
+
+async function getLastBroadcast() {
+    try {
+        if (await fs.pathExists(BROADCAST_FILE)) {
+            return await fs.readJson(BROADCAST_FILE);
+        }
+    } catch (error) {
+        console.error('Error reading broadcast file:', error);
+    }
+    return null;
+}
+
 module.exports = {
     getLang,
     setLang,
@@ -128,5 +155,7 @@ module.exports = {
     getResults,
     setResults,
     getAllUsers,
-    getUser
+    getUser,
+    saveBroadcast,
+    getLastBroadcast
 };

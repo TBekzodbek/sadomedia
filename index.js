@@ -11,7 +11,7 @@ const { searchVideo, searchMusic, getVideoInfo, getVideoTitle, downloadMedia } =
 const { recognizeAudio } = require('./utils/shazamService');
 const { getText } = require('./utils/localization');
 const { checkText, checkMetadata, addStrike, isUserBlocked, resetStrikes } = require('./utils/moderation');
-const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser } = require('./utils/storage');
+const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser, saveBroadcast, getLastBroadcast } = require('./utils/storage');
 
 // GLOBAL ERROR HANDLERS
 process.on('uncaughtException', (error) => {
@@ -211,6 +211,7 @@ function startBot() {
                 inline_keyboard: [
                     [{ text: "📊 Statistika", callback_data: 'admin_stats' }],
                     [{ text: "📢 Xabar yuborish (Broadcast)", callback_data: 'admin_broadcast' }],
+                    [{ text: "⬅️ Oxirgi xabarni o'chirish (Recall)", callback_data: 'admin_recall' }],
                     [{ text: "👥 Foydalanuvchilar bazasi", callback_data: 'admin_users' }],
                     [{ text: "❌ Panelni yopish", callback_data: 'admin_close' }]
                 ]
@@ -285,15 +286,18 @@ function startBot() {
 
             bot.sendMessage(chatId, `🚀 Broadcast boshlandi... (${userIds.length} foydalanuvchi)`);
 
+            const broadcastRecipients = [];
             for (const id of userIds) {
                 try {
-                    await bot.sendMessage(id, text);
+                    const sentMsg = await bot.sendMessage(id, text);
                     sentCount++;
+                    broadcastRecipients.push({ chatId: id, messageId: sentMsg.message_id });
                 } catch (err) {
                     failCount++;
                 }
             }
 
+            await saveBroadcast(text, broadcastRecipients);
             await setUserState(chatId, STATES.MAIN);
             bot.sendMessage(chatId, `✅ Broadcast yakunlandi.\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`, getMainMenu(lang));
             return;
@@ -520,6 +524,32 @@ function startBot() {
             } else if (data === 'admin_broadcast') {
                 await setUserState(chatId, STATES.WAITING_BROADCAST);
                 bot.sendMessage(chatId, "📝 **Hamma foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun /admin deb yozing)", { parse_mode: 'Markdown' });
+            } else if (data === 'admin_recall') {
+                const lastBroadcast = await getLastBroadcast();
+                if (!lastBroadcast || !lastBroadcast.recipients || lastBroadcast.recipients.length === 0) {
+                    bot.sendMessage(chatId, "⚠️ **O'chirish uchun xabarlar topilmadi.**\n(Faqat oxirgi yuborilgan xabarni o'chirish mumkin)");
+                    return;
+                }
+
+                bot.sendMessage(chatId, `⏳ **Xabarlar o'chirilmoqda...** (${lastBroadcast.recipients.length} ta xabar)`);
+
+                let deletedCount = 0;
+                let errorCount = 0;
+
+                for (const item of lastBroadcast.recipients) {
+                    try {
+                        await bot.deleteMessage(item.chatId, item.messageId);
+                        deletedCount++;
+                    } catch (e) {
+                        errorCount++;
+                    }
+                }
+
+                // Clear the file after recall
+                await saveBroadcast(null, []);
+
+                bot.sendMessage(chatId, `✅ **Xabarlar o'chirildi!**\n\n🟢 O'chirildi: ${deletedCount}\n🔴 Xatolik (allaqachon o'chirilgan yoki topilmadi): ${errorCount}`);
+
             } else if (data === 'admin_users') {
                 const allUsers = await getAllUsers();
                 const userEntries = Object.entries(allUsers);
