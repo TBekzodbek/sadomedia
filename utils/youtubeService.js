@@ -129,153 +129,156 @@ async function getVideoInfo(url) {
 
             cache.set(cacheKey, info, 300);
             return info;
+        } catch (e) {
+            console.warn(`⚠️ [youtubeService] Metadata fetch failed for ${client}: ${e.message}`);
         }
+    }
 
     // FINAL FALLBACK for metadata: try without any specific client/extractor args
     try {
-            console.log(`🔎 [youtubeService] Final fallback metadata fetch...`);
-            const flags = {
-                dumpSingleJson: true,
-                noWarnings: true,
-                forceIpv4: true,
-                noCheckCertificates: true,
-                geoBypass: true,
-                cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
-                ffmpegLocation: FFMPEG_LOCATION
-            };
-            const info = await youtubedl(url, flags, getBaseOptions());
-            if (info) {
-                if (!info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
-                    info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
-                }
-                cache.set(cacheKey, info, 300);
-                return info;
-            }
-        } catch (e) {
-            console.warn(`⚠️ [youtubeService] Final metadata fallback failed: ${e.message}`);
-        }
-
-        throw new Error('Could not fetch video metadata.');
-    }
-
-    async function getVideoTitle(url) {
-        try {
-            const info = await getVideoInfo(url);
-            return info ? info.title : 'Video';
-        } catch (e) {
-            return 'Video';
-        }
-    }
-
-    async function downloadMedia(url, type, options = {}) {
-        const { outputPath, height } = options;
-
-        let flags = {
-            output: outputPath,
-            noPlaylist: true,
+        console.log(`🔎 [youtubeService] Final fallback metadata fetch...`);
+        const flags = {
+            dumpSingleJson: true,
             noWarnings: true,
-            noColors: true,
-            noProgress: true,
-            concurrentFragments: 16,
-            httpChunkSize: '10M',
-            noMtime: true,
+            forceIpv4: true,
             noCheckCertificates: true,
             geoBypass: true,
             cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
             ffmpegLocation: FFMPEG_LOCATION
         };
-
-        const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-
-        if (type === 'audio') {
-            Object.assign(flags, {
-                extractAudio: true,
-                audioFormat: 'mp3',
-            });
-        } else if (type === 'video') {
-            const isNumericHeight = /^\d+$/.test(height);
-            let formatSelect;
-
-            if (isYouTube) {
-                // Priority: MP4 720p > MP4 Any Height > Best Video+Audio > Best Overall
-                formatSelect = isNumericHeight
-                    ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best`
-                    : 'best[height<=720][ext=mp4]/best[ext=mp4]/bestvideo[height<=720]+bestaudio/best';
-            } else {
-                formatSelect = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
+        const info = await youtubedl(url, flags, getBaseOptions());
+        if (info) {
+            if (!info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
+                info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
             }
-
-            Object.assign(flags, {
-                format: formatSelect,
-                mergeOutputFormat: 'mp4',
-            });
+            cache.set(cacheKey, info, 300);
+            return info;
         }
-
-        const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
-        let lastError = null;
-
-        for (const client of clients) {
-            try {
-                console.log(`📡 [youtubeService] Attempting download with client: ${client}...`);
-                const currentFlags = { ...flags };
-                if (isYouTube && client !== 'default') {
-                    currentFlags.extractorArgs = `youtube:player_client=${client}`;
-                }
-
-                // Using longer timeout for actual downloads
-                const downloadOpts = getBaseOptions();
-                downloadOpts.timeout = 300000; // 5 minutes for download
-
-                const result = await youtubedl(url, currentFlags, downloadOpts);
-
-                // Extract path from stdout if possible
-                const stdout = (typeof result === 'string') ? result : (result.stdout || '');
-                const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
-                const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
-
-                if (destMatches.length > 0) {
-                    let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
-                    if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
-                    if (fs.existsSync(foundPath)) return foundPath;
-                }
-
-                const base = outputPath.replace('.%(ext)s', '');
-                const extensions = type === 'audio' ? ['.mp3', '.m4a'] : ['.mp4', '.mkv', '.webm'];
-                for (const ext of extensions) {
-                    const fallbackPath = base + ext;
-                    if (fs.existsSync(fallbackPath)) return fallbackPath;
-                }
-            } catch (e) {
-                console.warn(`⚠️ [youtubeService] Client ${client} download failed: ${e.message}`);
-                lastError = e;
-            }
-        }
-
-        // FINAL FALLBACK: Simplest download
-        try {
-            console.log('🔄 [youtubeService] All clients failed or path error. Trying final fallback...');
-            const fallbackOpts = getBaseOptions();
-            fallbackOpts.timeout = 300000;
-
-            await youtubedl(url, { ...flags, format: 'best' }, fallbackOpts);
-
-            const base = outputPath.replace('.%(ext)s', '');
-            const exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv'];
-            for (const ext of exts) {
-                const fb = base + ext;
-                if (fs.existsSync(fb)) return fb;
-            }
-        } catch (e) {
-            lastError = e;
-        }
-
-        throw new Error(lastError ? lastError.message : 'Download failed completely.');
+    } catch (e) {
+        console.warn(`⚠️ [youtubeService] Final metadata fallback failed: ${e.message}`);
     }
 
-    module.exports = {
-        searchVideo,
-        searchMusic,
-        getVideoInfo,
-        getVideoTitle,
-        downloadMedia,
+    throw new Error('Could not fetch video metadata.');
+}
+
+async function getVideoTitle(url) {
+    try {
+        const info = await getVideoInfo(url);
+        return info ? info.title : 'Video';
+    } catch (e) {
+        return 'Video';
+    }
+}
+
+async function downloadMedia(url, type, options = {}) {
+    const { outputPath, height } = options;
+
+    let flags = {
+        output: outputPath,
+        noPlaylist: true,
+        noWarnings: true,
+        noColors: true,
+        noProgress: true,
+        concurrentFragments: 16,
+        httpChunkSize: '10M',
+        noMtime: true,
+        noCheckCertificates: true,
+        geoBypass: true,
+        cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
+        ffmpegLocation: FFMPEG_LOCATION
     };
+
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+
+    if (type === 'audio') {
+        Object.assign(flags, {
+            extractAudio: true,
+            audioFormat: 'mp3',
+        });
+    } else if (type === 'video') {
+        const isNumericHeight = /^\d+$/.test(height);
+        let formatSelect;
+
+        if (isYouTube) {
+            // Priority: MP4 720p > MP4 Any Height > Best Video+Audio > Best Overall
+            formatSelect = isNumericHeight
+                ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best`
+                : 'best[height<=720][ext=mp4]/best[ext=mp4]/bestvideo[height<=720]+bestaudio/best';
+        } else {
+            formatSelect = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
+        }
+
+        Object.assign(flags, {
+            format: formatSelect,
+            mergeOutputFormat: 'mp4',
+        });
+    }
+
+    const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
+    let lastError = null;
+
+    for (const client of clients) {
+        try {
+            console.log(`📡 [youtubeService] Attempting download with client: ${client}...`);
+            const currentFlags = { ...flags };
+            if (isYouTube && client !== 'default') {
+                currentFlags.extractorArgs = `youtube:player_client=${client}`;
+            }
+
+            // Using longer timeout for actual downloads
+            const downloadOpts = getBaseOptions();
+            downloadOpts.timeout = 300000; // 5 minutes for download
+
+            const result = await youtubedl(url, currentFlags, downloadOpts);
+
+            // Extract path from stdout if possible
+            const stdout = (typeof result === 'string') ? result : (result.stdout || '');
+            const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
+            const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
+
+            if (destMatches.length > 0) {
+                let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
+                if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
+                if (fs.existsSync(foundPath)) return foundPath;
+            }
+
+            const base = outputPath.replace('.%(ext)s', '');
+            const extensions = type === 'audio' ? ['.mp3', '.m4a'] : ['.mp4', '.mkv', '.webm'];
+            for (const ext of extensions) {
+                const fallbackPath = base + ext;
+                if (fs.existsSync(fallbackPath)) return fallbackPath;
+            }
+        } catch (e) {
+            console.warn(`⚠️ [youtubeService] Client ${client} download failed: ${e.message}`);
+            lastError = e;
+        }
+    }
+
+    // FINAL FALLBACK: Simplest download
+    try {
+        console.log('🔄 [youtubeService] All clients failed or path error. Trying final fallback...');
+        const fallbackOpts = getBaseOptions();
+        fallbackOpts.timeout = 300000;
+
+        await youtubedl(url, { ...flags, format: 'best' }, fallbackOpts);
+
+        const base = outputPath.replace('.%(ext)s', '');
+        const exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv'];
+        for (const ext of exts) {
+            const fb = base + ext;
+            if (fs.existsSync(fb)) return fb;
+        }
+    } catch (e) {
+        lastError = e;
+    }
+
+    throw new Error(lastError ? lastError.message : 'Download failed completely.');
+}
+
+module.exports = {
+    searchVideo,
+    searchMusic,
+    getVideoInfo,
+    getVideoTitle,
+    downloadMedia,
+};
