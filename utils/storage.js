@@ -92,6 +92,7 @@ async function setState(chatId, state) {
 let transientDb = {
     requests: {}, // { chatId: { url, title, type, timestamp } }
     results: {},  // { chatId: { total: [], page: 0 } }
+    broadcasts: {}, // { chatId: { text, photo, etc } }
 };
 
 function getRequest(chatId) {
@@ -115,6 +116,18 @@ function setResults(chatId, data) {
         delete transientDb.results[chatId];
     } else {
         transientDb.results[chatId] = data;
+    }
+}
+
+function getBroadcastContent(chatId) {
+    return transientDb.broadcasts[chatId];
+}
+
+function setBroadcastContent(chatId, data) {
+    if (data === null) {
+        delete transientDb.broadcasts[chatId];
+    } else {
+        transientDb.broadcasts[chatId] = data;
     }
 }
 
@@ -157,5 +170,7 @@ module.exports = {
     getAllUsers,
     getUser,
     saveBroadcast,
-    getLastBroadcast
+    getLastBroadcast,
+    getBroadcastContent,
+    setBroadcastContent
 };

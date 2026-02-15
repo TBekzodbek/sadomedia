@@ -82,6 +82,8 @@ async function getVideoInfo(url) {
                 youtubeSkipDashManifest: true,
                 ffmpegLocation: FFMPEG_LOCATION,
                 forceIpv4: true,
+                noCheckCertificates: true,
+                geoBypass: true,
                 cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined
             };
 
@@ -124,6 +126,9 @@ async function downloadMedia(url, type, options = {}) {
         noProgress: true,
         concurrentFragments: 16,
         httpChunkSize: '10M',
+        noMtime: true,
+        noCheckCertificates: true,
+        geoBypass: true,
     };
 
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');

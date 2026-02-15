@@ -11,7 +11,7 @@ const { searchVideo, searchMusic, getVideoInfo, getVideoTitle, downloadMedia } =
 const { recognizeAudio } = require('./utils/shazamService');
 const { getText } = require('./utils/localization');
 const { checkText, checkMetadata, addStrike, isUserBlocked, resetStrikes } = require('./utils/moderation');
-const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser, saveBroadcast, getLastBroadcast } = require('./utils/storage');
+const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser, saveBroadcast, getLastBroadcast, getBroadcastContent, setBroadcastContent } = require('./utils/storage');
 
 // GLOBAL ERROR HANDLERS
 process.on('uncaughtException', (error) => {
@@ -60,7 +60,8 @@ const STATES = {
     WAITING_MUSIC: 'WAITING_MUSIC',
     WAITING_VIDEO: 'WAITING_VIDEO',
     WAITING_AUDIO: 'WAITING_AUDIO',
-    WAITING_BROADCAST: 'WAITING_BROADCAST'
+    WAITING_BROADCAST: 'WAITING_BROADCAST',
+    WAITING_BROADCAST_CONFIRM: 'WAITING_BROADCAST_CONFIRM'
 };
 
 // Graceful Shutdown Handler
@@ -267,39 +268,61 @@ function startBot() {
 
         console.log(`📩 [ID: ${INSTANCE_ID}] Message from ${user}: ${text || '[Media]'}`);
 
-        if (!text || text.startsWith('/')) return;
-
         const lang = await getLang(chatId);
 
-        // STRIKE CHECKS (Block Middleware)
-        if (isUserBlocked(chatId)) {
-            bot.sendMessage(chatId, getText(lang, 'user_blocked'));
+        // --- GLOBAL COMMAND INTERRUPTS --- (Allow escape from any state)
+        if (text && text.startsWith('/')) {
+            // Let the bot.onText handlers handle commands
             return;
         }
 
+        if (text === getText(lang, 'menu_back')) {
+            await setUserState(chatId, STATES.MAIN);
+            setRequest(chatId, null);
+            setBroadcastContent(chatId, null);
+            bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
+            return;
+        }
+
+        // Check if it's any of the main menu buttons to allow switching modes
+        const menuKeys = ['menu_music', 'menu_video', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
+        let matchedMenu = false;
+        for (const key of menuKeys) {
+            if (isCommand(text, key)) {
+                matchedMenu = true;
+                break;
+            }
+        }
+
+        // If it's a menu button and not in a state that specifically MUST handle text
+        if (matchedMenu) {
+            // Let the Menu Commands section below handle it
+            // This allows an admin to click "Settings" or "Back" to exit broadcast mode
+        } else {
+            // STRIKE CHECKS (Block Middleware)
+            if (isUserBlocked(chatId)) {
+                bot.sendMessage(chatId, getText(lang, 'user_blocked'));
+                return;
+            }
+        }
+
+        if (!text) return;
+
         // --- BROADCAST HANDLING ---
         if (await getUserState(chatId) === STATES.WAITING_BROADCAST && isAdmin(chatId)) {
-            const allUsers = await getAllUsers();
-            const userIds = Object.keys(allUsers);
-            let sentCount = 0;
-            let failCount = 0;
+            // Instead of sending, ask for confirmation
+            await setBroadcastContent(chatId, { text });
+            await setUserState(chatId, STATES.WAITING_BROADCAST_CONFIRM);
 
-            bot.sendMessage(chatId, `🚀 Broadcast boshlandi... (${userIds.length} foydalanuvchi)`);
-
-            const broadcastRecipients = [];
-            for (const id of userIds) {
-                try {
-                    const sentMsg = await bot.sendMessage(id, text);
-                    sentCount++;
-                    broadcastRecipients.push({ chatId: id, messageId: sentMsg.message_id });
-                } catch (err) {
-                    failCount++;
+            bot.sendMessage(chatId, `📑 **Xabar ko'rinishi:**\n\n${text}\n\n⚠️ **Haqiqatdan ham hamma foydalanuvchilarga yubormoqchimisiz?**`, {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: "✅ Ha, yuborilsin (Send)", callback_data: 'confirm_broadcast' }],
+                        [{ text: "❌ Bekor qilish (Cancel)", callback_data: 'cancel_broadcast' }]
+                    ]
                 }
-            }
-
-            await saveBroadcast(text, broadcastRecipients);
-            await setUserState(chatId, STATES.MAIN);
-            bot.sendMessage(chatId, `✅ Broadcast yakunlandi.\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`, getMainMenu(lang));
+            });
             return;
         }
 
@@ -358,6 +381,11 @@ function startBot() {
                     inline_keyboard: [[{ text: getText(lang, 'btn_share'), url: shareLink }]]
                 }
             });
+            return;
+        }
+
+        // Check if we are in WAITING_BROADCAST_CONFIRM and received text (ignore it)
+        if (await getUserState(chatId) === STATES.WAITING_BROADCAST_CONFIRM) {
             return;
         }
 
@@ -523,7 +551,47 @@ function startBot() {
                 bot.sendMessage(chatId, `📊 **Statistika:**\n\nJami foydalanuvchilar: ${userCount}`, { parse_mode: 'Markdown' });
             } else if (data === 'admin_broadcast') {
                 await setUserState(chatId, STATES.WAITING_BROADCAST);
-                bot.sendMessage(chatId, "📝 **Hamma foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun /admin deb yozing)", { parse_mode: 'Markdown' });
+                bot.sendMessage(chatId, "📝 **Hamma foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun menyudan boshqa bo'limni tanlang)", { parse_mode: 'Markdown' });
+            } else if (data === 'confirm_broadcast' || data === 'cancel_broadcast') {
+                if (!isAdmin(chatId)) return;
+
+                if (data === 'cancel_broadcast') {
+                    await setBroadcastContent(chatId, null);
+                    await setUserState(chatId, STATES.MAIN);
+                    bot.editMessageText("❌ **Broadcast bekor qilindi.**", { chatId, message_id: query.message.message_id });
+                    bot.sendMessage(chatId, getText(lang, 'main_menu'), getMainMenu(lang));
+                    return;
+                }
+
+                const content = getBroadcastContent(chatId);
+                if (!content || !content.text) {
+                    bot.sendMessage(chatId, "⚠️ Xato: Xabar mazmuni topilmadi.");
+                    return;
+                }
+
+                bot.editMessageText("🚀 **Broadcast boshlandi...**", { chatId, message_id: query.message.message_id });
+
+                const allUsers = await getAllUsers();
+                const userIds = Object.keys(allUsers);
+                let sentCount = 0;
+                let failCount = 0;
+                const broadcastRecipients = [];
+
+                for (const id of userIds) {
+                    try {
+                        const sentMsg = await bot.sendMessage(id, content.text);
+                        sentCount++;
+                        broadcastRecipients.push({ chatId: id, messageId: sentMsg.message_id });
+                    } catch (err) {
+                        failCount++;
+                    }
+                }
+
+                await saveBroadcast(content.text, broadcastRecipients);
+                await setBroadcastContent(chatId, null);
+                await setUserState(chatId, STATES.MAIN);
+                bot.sendMessage(chatId, `✅ **Broadcast yakunlandi.**\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`, getMainMenu(lang));
+
             } else if (data === 'admin_recall') {
                 const lastBroadcast = await getLastBroadcast();
                 if (!lastBroadcast || !lastBroadcast.recipients || lastBroadcast.recipients.length === 0) {
@@ -796,8 +864,13 @@ function startBot() {
 
         } catch (error) {
             console.error('Download Error:', error);
-            const errMsg = error.message.substring(0, 120);
-            bot.sendMessage(chatId, `${getText(lang, 'error')}\n\n⚠️ Detail: ${errMsg}`, getBackMenu(lang));
+            let errMsg = error.message;
+            if (errMsg.includes('Requested format is not available')) errMsg = "Tanlangan format mavjud emas. Iltimos, boshqa sifatni sinab ko'ring.";
+            else if (errMsg.includes('Video unavailable')) errMsg = "Video topilmadi yoki o'chirib tashlangan.";
+            else if (errMsg.includes('Sign in to confirm')) errMsg = "Bu video yosh chekloviga ega yoki avtorizatsiya talab qiladi.";
+            else if (errMsg.length > 150) errMsg = errMsg.substring(0, 150) + '...';
+
+            bot.sendMessage(chatId, `${getText(lang, 'error')}\n\n⚠️ **Sabab:** ${errMsg}`, getBackMenu(lang));
         }
     }
 
