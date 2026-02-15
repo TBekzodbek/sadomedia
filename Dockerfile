@@ -1,5 +1,5 @@
 # Use a base image with Node.js
-FROM node:18-slim
+FROM node:22-slim
 
 # Install system dependencies: Python3 (for yt-dlp) and FFmpeg
 RUN apt-get update && \
