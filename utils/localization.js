@@ -1,13 +1,11 @@
 const TEXTS = {
     uz: {
-        welcome: "🌟 **Assalomu alaykum! SadoMedia Bot ga xush kelibsiz!**\n\n🤖 **Men orqali siz:**\n• YouTube, Instagram, TikTok dan video yuklashingiz 📥\n• Musiqa va audio kitoblar topishingiz 🎧\n\n👇 **Foydalanish uchun:**\n\n1. 🎵 **Musiqa:** Ijrochi yoki qo'shiq nomini yuboring.\n2. 📹 **Video:** Havolani (link) yuboring (YouTube/Instagram).",
+        welcome: "🌟 **Assalomu alaykum! SadoMedia Bot ga xush kelibsiz!**\n\n🤖 **Men orqali siz:**\n• YouTube, Instagram, TikTok dan video yuklashingiz 📥\n• Musiqa topishingiz 🎵\n\n👇 **Foydalanish uchun:**\n\n1. 🎵 **Musiqa:** Ijrochi yoki qo'shiq nomini yuboring.\n2. 📹 **Video:** Havolani (link) yuboring (YouTube/Instagram).",
         main_menu: "Asosiy menyu",
         menu_music: "🎵 Musiqa topish",
         menu_video: "🎬 Video yuklash",
-        menu_audio: "🎧 Audio yuklash",
         menu_help: "❓ Yordam",
         menu_back: "🏠 Bosh sahifa",
-        menu_lang: "🌐 Tilni o'zgartirish",
 
         prompt_music: "🔍 **Musiqa nomini yoki ijrochini yozing.**\n\nMisol: *Eminem Lose Yourself*",
         prompt_video: "📥 **Video havolasini (link) yuboring:**\n(YouTube, Instagram, TikTok)",
@@ -50,14 +48,12 @@ const TEXTS = {
         btn_share: "📲 Ulashish"
     },
     uz_cyrl: {
-        welcome: "🌟 **Ассалому алайкум! SadoMedia Bot га хуш келибсиз!**\n\n🤖 **Мен орқали сиз:**\n• YouTube, Instagram, TikTok дан видео юклашингиз 📥\n• Мусиқа ва аудио китоблар топишингиз 🎧\n\n👇 **Фойдаланиш учун:**\n\n1. 🎵 **Мусиқа:** Ижрочи ёки қўшиқ номини юборинг.\n2. 📹 **Видео:** Ҳаволани (link) юборинг (YouTube/Instagram).",
+        welcome: "🌟 **Ассалому алайкум! SadoMedia Bot га хуш келибсиз!**\n\n🤖 **Мен орқали сиз:**\n• YouTube, Instagram, TikTok дан видео юклашингиз 📥\n• Мусиқа топишингиз 🎵\n\n👇 **Фойдаланиш учун:**\n\n1. 🎵 **Мусиқа:** Ижрочи ёки қўшиқ номи юборинг.\n2. 📹 **Видео:** Ҳаволани (link) юборинг (YouTube/Instagram).",
         main_menu: "Асосий меню",
         menu_music: "🎵 Мусиқа топиш",
         menu_video: "🎬 Видео юклаш",
-        menu_audio: "🎧 Аудио юклаш",
         menu_help: "❓ Ёрдам",
         menu_back: "🏠 Бош саҳифа",
-        menu_lang: "🌐 Тилни ўзгартириш",
 
         prompt_music: "🔍 **Мусиқа номини ёки ижрочини ёзинг.**\n\nМисол: *Eminem Lose Yourself*",
         prompt_video: "📥 **Видео ҳаволасини (link) юборинг:**\n(YouTube, Instagram, TikTok)",
@@ -100,14 +96,12 @@ const TEXTS = {
         btn_share: "📲 Улашиш"
     },
     ru: {
-        welcome: "🌟 **Привет! Добро пожаловать в SadoMedia Bot!**\n\n🤖 **Я умею:**\n• Скачивать видео с YouTube, Instagram, TikTok 📥\n• Находить музыку и аудиокниги 🎧\n\n👇 **Как пользоваться:**\n\n1. 🎵 **Музыка:** Отправьте имя исполнителя или название песни.\n2. 📹 **Видео:** Отправьте ссылку (YouTube/Instagram).",
+        welcome: "🌟 **Привет! Добро пожаловать в SadoMedia Bot!**\n\n🤖 **Я умею:**\n• Скачивать видео с YouTube, Instagram, TikTok 📥\n• Находить музыку 🎵\n\n👇 **Как пользоваться:**\n\n1. 🎵 **Музыка:** Отправьте имя исполнителя или название песни.\n2. 📹 **Видео:** Отправьте ссылку (YouTube/Instagram).",
         main_menu: "Главное меню",
         menu_music: "🎵 Найти музыку",
         menu_video: "🎬 Скачать видео",
-        menu_audio: "🎧 Скачать аудио",
         menu_help: "❓ Помощь",
         menu_back: "🏠 Главная",
-        menu_lang: "🌐 Сменить язык",
 
         prompt_music: "🔍 **Введите название песни или исполнителя.**\n\nПример: *Eminem Lose Yourself*",
         prompt_video: "📥 **Отправьте ссылку на видео:**\n(YouTube, Instagram, TikTok)",
@@ -150,14 +144,12 @@ const TEXTS = {
         btn_share: "📲 Поделиться"
     },
     en: {
-        welcome: "🌟 **Hello! Welcome to SadoMedia Bot!**\n\n🤖 **I can:**\n• Download videos from YouTube, Instagram, TikTok 📥\n• Find music and audiobooks 🎧\n\n👇 **How to use:**\n\n1. 🎵 **Music:** Send Artist/Song name.\n2. 📹 **Video:** Send link (YouTube/Instagram).",
+        welcome: "🌟 **Hello! Welcome to SadoMedia Bot!**\n\n🤖 **I can:**\n• Download videos from YouTube, Instagram, TikTok 📥\n• Find music 🎵\n\n👇 **How to use:**\n\n1. 🎵 **Music:** Send Artist/Song name.\n2. 📹 **Video:** Send link (YouTube/Instagram).",
         main_menu: "Main Menu",
         menu_music: "🎵 Find Music",
         menu_video: "🎬 Download Video",
-        menu_audio: "🎧 Download Audio",
         menu_help: "❓ Help",
         menu_back: "🏠 Home",
-        menu_lang: "🌐 Change Language",
 
         prompt_music: "🔍 **Type the song name or artist.**\n\nExample: *Eminem Lose Yourself*",
         prompt_video: "📥 **Send the video link:**\n(YouTube, Instagram, TikTok)",

@@ -151,8 +151,7 @@ function startBot() {
     const getMainMenu = (lang) => {
         const keyboard = [];
         keyboard.push([{ text: getText(lang, 'menu_music') }, { text: getText(lang, 'menu_video') }]);
-        keyboard.push([{ text: getText(lang, 'menu_audio') }, { text: getText(lang, 'menu_help') }]);
-        keyboard.push([{ text: getText(lang, 'menu_lang') }, { text: getText(lang, 'menu_share') }]);
+        keyboard.push([{ text: getText(lang, 'menu_help') }, { text: getText(lang, 'menu_share') }]);
 
         return {
             reply_markup: {
@@ -339,28 +338,12 @@ function startBot() {
             return;
         }
 
-        if (isCommand(text, 'menu_audio')) {
-            await setUserState(chatId, STATES.WAITING_AUDIO);
-            bot.sendMessage(chatId, getText(lang, 'prompt_audio'), getBackMenu(lang));
-            return;
-        }
 
         if (isCommand(text, 'menu_help')) {
             bot.sendMessage(chatId, getText(lang, 'help_text'), getMainMenu(lang));
             return;
         }
 
-        if (isCommand(text, 'menu_lang')) {
-            bot.sendMessage(chatId, "🌐 Tilni tanlang / Выберите язык / Select language:", {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: "🇺🇿 O'zbekcha", callback_data: 'lang_uz' }, { text: "🇺🇿 Ўзбекча (Кирилл)", callback_data: 'lang_uz_cyrl' }],
-                        [{ text: "🇷🇺 Русский", callback_data: 'lang_ru' }, { text: "🇬🇧 English", callback_data: 'lang_en' }]
-                    ]
-                }
-            });
-            return;
-        }
 
         // --- GLOBAL COMMANDS ---
 
