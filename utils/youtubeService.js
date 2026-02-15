@@ -110,9 +110,7 @@ async function getVideoInfo(url) {
             const flags = {
                 dumpSingleJson: true,
                 noWarnings: true,
-                noCallHome: true,
                 preferFreeFormats: true,
-                youtubeSkipDashManifest: true,
                 forceIpv4: true,
                 noCheckCertificates: true,
                 geoBypass: true,
