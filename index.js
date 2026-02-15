@@ -411,7 +411,7 @@ function startBot() {
         // Non-blocking search
         const searchQuery = `${text} audio`;
 
-        searchMusic(searchQuery, 10).then(output => {
+        searchMusic(searchQuery, 50).then(output => {
             const entries = output.entries || (Array.isArray(output) ? output : [output]);
 
             if (!entries || entries.length === 0) {
@@ -751,14 +751,16 @@ function startBot() {
             const stopAction = sendActionLoop(chatId, 'typing'); // Search might take a moment
 
             // Use searchMusic to ensure we get the song, not a reaction/loop
-            searchMusic(queryText, 5).then(output => {
+            searchMusic(queryText, 50).then(output => {
                 const entries = output.entries || (Array.isArray(output) ? output : [output]);
                 if (!entries || entries.length === 0) {
                     debugSend(chatId, getText(lang, 'not_found'), getBackMenu(lang));
                     return;
                 }
                 const searchKeyboard = [];
-                entries.forEach((entry, index) => {
+                const pageResults = entries.slice(0, 10);
+
+                pageResults.forEach((entry, index) => {
                     // Format Duration
                     let durationStr = '';
                     if (entry.duration) {
@@ -769,6 +771,13 @@ function startBot() {
                     }
                     searchKeyboard.push([{ text: `${index + 1}. ${entry.title.substring(0, 50)}${durationStr}`, callback_data: `sel_${entry.id}` }]);
                 });
+
+                // Add Next Button if there are more than 10 results
+                if (entries.length > 10) {
+                    setResults(chatId, { total: entries, page: 1 });
+                    searchKeyboard.push([{ text: "➡️ Keyingisi / Next", callback_data: `next_results` }]);
+                }
+
                 debugSend(chatId, `🎶 **Natijalar:**`, { reply_markup: { inline_keyboard: searchKeyboard } });
             }).finally(() => stopAction());
             return;
