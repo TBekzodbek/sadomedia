@@ -118,12 +118,6 @@ function startBot() {
         botUsername = me.username;
         console.log(`✅ [ID: ${INSTANCE_ID}] Bot muvaffaqiyatli ulandi! Username: @${botUsername}`);
         console.log(`📡 [ID: ${INSTANCE_ID}] Polling boshlandi...`);
-
-        // Notify Admins on startup
-        const escapedMeUsername = me.username.replace(/_/g, '\\_');
-        ADMIN_IDS.forEach(adminId => {
-            bot.sendMessage(adminId, `🚀 **Bot Ishga Tushdi!**\n\n📌 **Instance ID:** ${INSTANCE_ID}\n🤖 **Bot:** @${escapedMeUsername}\n🔄 **Hozirgi holat:** Polling boshlandi.`, { parse_mode: 'Markdown' }).catch(() => { });
-        });
     }).catch(err => {
         console.error(`❌ [ID: ${INSTANCE_ID}] Bot ulanishda xatolik:`, err.message);
     });
