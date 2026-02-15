@@ -551,7 +551,7 @@ function startBot() {
                 if (data === 'cancel_broadcast') {
                     await setBroadcastContent(chatId, null);
                     await setUserState(chatId, STATES.MAIN);
-                    bot.editMessageText("❌ **Broadcast bekor qilindi.**", { chatId, message_id: query.message.message_id });
+                    bot.editMessageText("❌ **Broadcast bekor qilindi.**", { chat_id: chatId, message_id: query.message.message_id });
                     bot.sendMessage(chatId, getText(lang, 'main_menu'), getMainMenu(lang));
                     return;
                 }
@@ -562,7 +562,7 @@ function startBot() {
                     return;
                 }
 
-                bot.editMessageText("🚀 **Broadcast boshlandi...**", { chatId, message_id: query.message.message_id });
+                bot.editMessageText("🚀 **Broadcast boshlandi...**", { chat_id: chatId, message_id: query.message.message_id });
 
                 const allUsers = await getAllUsers();
                 const userIds = Object.keys(allUsers);
@@ -698,7 +698,7 @@ function startBot() {
                 setResults(chatId, null);
             }
 
-            bot.editMessageReplyMarkup({ inline_keyboard: searchKeyboard }, { chatId, message_id: query.message.message_id });
+            bot.editMessageReplyMarkup({ inline_keyboard: searchKeyboard }, { chat_id: chatId, message_id: query.message.message_id });
             return;
         }
 
@@ -707,7 +707,7 @@ function startBot() {
             const videoId = data.replace('sel_', '');
             const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-            bot.editMessageText(getText(lang, 'downloading'), { chatId, messageId: query.message.message_id });
+            bot.editMessageText(getText(lang, 'downloading'), { chat_id: chatId, message_id: query.message.message_id });
 
             // Start "uploading audio" action loop
             const stopAction = sendActionLoop(chatId, 'upload_voice');
