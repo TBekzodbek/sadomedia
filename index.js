@@ -152,7 +152,7 @@ function startBot() {
         keyboard.push([{ text: getText(lang, 'menu_music') }, { text: getText(lang, 'menu_video') }]);
         keyboard.push([{ text: getText(lang, 'menu_audio') }, { text: getText(lang, 'menu_help') }]);
         keyboard.push([{ text: getText(lang, 'menu_lang') }, { text: getText(lang, 'menu_share') }]);
-        
+
         return {
             reply_markup: {
                 keyboard: keyboard,
@@ -167,6 +167,14 @@ function startBot() {
             resize_keyboard: true
         }
     });
+
+    // Higher-order helper for robust command matching
+    const { TEXTS: ALL_TEXTS } = require('./utils/localization');
+    const isCommand = (text, key) => {
+        if (!text) return false;
+        const normalizedText = text.trim();
+        return Object.values(ALL_TEXTS).some(langTexts => langTexts[key] === normalizedText);
+    };
 
     // Removed static MAIN_MENU and BACK_MENU in favor of dynamic functions
 
@@ -292,30 +300,30 @@ function startBot() {
         }
 
         // --- MENU COMMANDS ---
-        if (text === getText(lang, 'menu_music')) {
+        if (isCommand(text, 'menu_music')) {
             await setUserState(chatId, STATES.WAITING_MUSIC);
             bot.sendMessage(chatId, getText(lang, 'prompt_music'), getBackMenu(lang));
             return;
         }
 
-        if (text === getText(lang, 'menu_video')) {
+        if (isCommand(text, 'menu_video')) {
             await setUserState(chatId, STATES.WAITING_VIDEO);
             bot.sendMessage(chatId, getText(lang, 'prompt_video'), getBackMenu(lang));
             return;
         }
 
-        if (text === getText(lang, 'menu_audio')) {
+        if (isCommand(text, 'menu_audio')) {
             await setUserState(chatId, STATES.WAITING_AUDIO);
             bot.sendMessage(chatId, getText(lang, 'prompt_audio'), getBackMenu(lang));
             return;
         }
 
-        if (text === getText(lang, 'menu_help')) {
+        if (isCommand(text, 'menu_help')) {
             bot.sendMessage(chatId, getText(lang, 'help_text'), getMainMenu(lang));
             return;
         }
 
-        if (text === getText(lang, 'menu_lang')) {
+        if (isCommand(text, 'menu_lang')) {
             bot.sendMessage(chatId, "🌐 Tilni tanlang / Выберите язык / Select language:", {
                 reply_markup: {
                     inline_keyboard: [
@@ -329,14 +337,14 @@ function startBot() {
 
         // --- GLOBAL COMMANDS ---
 
-        if (text === getText(lang, 'menu_back')) {
+        if (isCommand(text, 'menu_back')) {
             await setUserState(chatId, STATES.MAIN);
             setRequest(chatId, null);
             bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
             return;
         }
 
-        if (text === getText(lang, 'menu_share')) {
+        if (isCommand(text, 'menu_share')) {
             const shareText = getText(lang, 'share_text').replace('{username}', botUsername);
             const shareLink = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${encodeURIComponent(getText(lang, 'share_text').replace('{username}', botUsername))}`;
 
@@ -529,7 +537,7 @@ function startBot() {
                         // Combine names and escape markdown
                         let displayName = (fname + ' ' + lname).trim();
                         if (!displayName) displayName = 'Noma\'lum';
-                        
+
                         // Clean for MarkdownV2/Stable Markdown
                         const safeName = displayName.replace(/[_*`[\]()]/g, '\\$&');
                         const safeUname = uname ? ` (@${uname.replace(/[_*`[\]()]/g, '\\$&')})` : '';
@@ -538,7 +546,7 @@ function startBot() {
                     });
 
                     if (userEntries.length > 50) userList += "\n...va yana ko'plab foydalanuvchilar.";
-                    
+
                     try {
                         await bot.sendMessage(chatId, userList, { parse_mode: 'Markdown' });
                     } catch (sendErr) {
