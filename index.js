@@ -559,18 +559,7 @@ function startBot() {
             }
 
             // Fetch info to determine media type
-            let info;
-            try {
-                info = await getVideoInfo(url);
-            } catch (error) {
-                await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
-                if (error.message === 'LOGIN_REQUIRED') {
-                    return debugSend(chatId, getText(lang, 'login_required'), getBackMenu(lang));
-                }
-                debugSend(chatId, getText(lang, 'error') + '\n\n' + error.message, getBackMenu(lang));
-                return;
-            }
-
+            const info = await getVideoInfo(url).catch(() => null);
             if (!info) {
                 await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
                 debugSend(chatId, getText(lang, 'error'), getBackMenu(lang));
@@ -584,10 +573,10 @@ function startBot() {
             // Pinterest images, X photos, Facebook photos, Instagram photos etc.
             const isPinterestImage = url.includes('pinterest.com') && (!info.video_ext || info.video_ext === 'none');
             const isXImage = (url.includes('x.com') || url.includes('twitter.com')) && (!info.video_ext || info.video_ext === 'none') && (info.url && info.url.match(/\.(jpg|jpeg|png|webp)/i));
-            const isFBImage = (url.includes('facebook.com') && url.includes('/photo')) || info.is_image;
-            const isInstagramImage = (url.includes('instagram.com') && (url.includes('/p/') || url.includes('/reels/'))) || (info.extractor === 'instagram:fallback' && info.is_image);
+            const isFBImage = url.includes('facebook.com') && url.includes('/photo') && (!info.video_ext || info.video_ext === 'none');
+            const isInstagramImage = url.includes('instagram.com') && (url.includes('/p/') || url.includes('/reels/')) && (!info.video_ext || info.video_ext === 'none');
 
-            const isPhoto = isPinterestImage || isXImage || isFBImage || isInstagramImage || info.is_image;
+            const isPhoto = isPinterestImage || isXImage || isFBImage || isInstagramImage;
             const type = isPhoto ? 'photo' : 'video';
 
             await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
@@ -1023,9 +1012,6 @@ function startBot() {
             console.error('Download Error:', error);
             if (error.message === 'RESTRICTED_PLATFORM_IMAGE') {
                 return debugSend(chatId, getText(lang, 'restricted_content'), getBackMenu(lang));
-            }
-            if (error.message === 'LOGIN_REQUIRED') {
-                return debugSend(chatId, getText(lang, 'login_required'), getBackMenu(lang));
             }
             let errMsg = error.message;
             if (errMsg.includes('Requested format is not available')) errMsg = "Tanlangan format mavjud emas. Iltimos, boshqa sifatni sinab ko'ring.";
