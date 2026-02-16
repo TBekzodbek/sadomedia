@@ -290,7 +290,9 @@ async function downloadMedia(url, type, options = {}) {
         Object.assign(flags, {
             extractAudio: true,
             audioFormat: 'mp3',
+            audioQuality: '0', // Best quality
         });
+        console.log(`🎵 [youtubeService] Audio download flags:`, flags);
     } else if (type === 'video') {
         const isNumericHeight = /^\d+$/.test(height);
         let formatSelect;
@@ -339,11 +341,22 @@ async function downloadMedia(url, type, options = {}) {
             }
         }
 
+        // Facebook Photo Fallback: yt-dlp usually fails here without cookies
+        if (url.includes('facebook.com')) {
+            const info = cache.get(`info:${url}`);
+            // If yt-dlp didn't find a direct URL or format, and it's recognized as a photo
+            if (!info || !info.url || info.url.includes('facebook.com/photo')) {
+                throw new Error('RESTRICTED_PLATFORM_IMAGE');
+            }
+        }
+
         Object.assign(flags, {
             format: 'best',
             // Some platforms return raw images
         });
     }
+
+    console.log(`🚀 [youtubeService] Final ${type} download flags:`, flags);
 
     const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
     let lastError = null;

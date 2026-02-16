@@ -23,6 +23,8 @@ const TEXTS = {
         error: "❌ Xatolik yuz berdi.",
         invalid_link: "❌ **Noto'g'ri havola.**\nIltimos, to'g'ri video havolasini yuboring.",
         file_too_large: "⚠️ Fayl hajmi juda katta. Telegram orqali yuborib bo'lmaydi.",
+        restricted_content: "⚠️ **Cheklov.**\nUshbu platforma (masalan, Facebook) rasm yuklashni taqiqlagan yoki rasm shaxsiy kontent hisoblanadi. Uni bot orqali yuklab bo'lmaydi.",
+        session_expired: "⚠️ **Seans muddati tugadi.**\nIltimos, havolani qaytadan yuboring.",
 
         done: "✅ **Tayyor! Yana nima qilamiz?**",
         search_again: "🔁 Yana qidirish",
@@ -73,6 +75,8 @@ const TEXTS = {
         error: "❌ Хатолик юз берди.",
         invalid_link: "❌ **Нотўғри ҳавола.**\nИлтимос, тўғри видео ҳаволасини юборинг.",
         file_too_large: "⚠️ Файл ҳажми жуда катта. Telegram орқали юбориб бўлмайди.",
+        restricted_content: "⚠️ **Чеклов.**\nУшбу платформа (масалан, Facebook) расм юклашни тақиқлаган ёки расм шахсий контент ҳисобланади. Уни бот орқали юклаб бўлмайди.",
+        session_expired: "⚠️ **Сеанс муддати тугади.**\nИлтимос, ҳаволани қайтадан юборинг.",
 
         done: "✅ **Тайёр! Яна нима қиламиз?**",
         search_again: "🔁 Яна қидириш",
@@ -123,6 +127,8 @@ const TEXTS = {
         error: "❌ Произошла ошибка.",
         invalid_link: "❌ **Неверная ссылка.**\nПожалуйста, отправьте правильную ссылку.",
         file_too_large: "⚠️ Файл слишком большой для отправки через Telegram.",
+        restricted_content: "⚠️ **Ограничение.**\nЭта платформа (например, Facebook) запрещает загрузку изображений или это частный контент. Его нельзя скачать через бота.",
+        session_expired: "⚠️ **Сессия истекла.**\nПожалуйста, отправьте ссылку снова.",
 
         done: "✅ **Готово! Что дальше?**",
         search_again: "🔁 Искать снова",
@@ -173,6 +179,8 @@ const TEXTS = {
         error: "❌ An error occurred.",
         invalid_link: "❌ **Invalid link.**\n\nPlease send a valid video link.",
         file_too_large: "⚠️ File is too large to send via Telegram.",
+        restricted_content: "⚠️ **Platform Restriction.**\nThis platform (e.g., Facebook) restricts direct image downloads or the content is private. It cannot be downloaded via the bot.",
+        session_expired: "⚠️ **Session expired.**\nPlease send the link again.",
 
         done: "✅ **Done! What's next?**",
         search_again: "🔁 Search Again",

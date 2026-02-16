@@ -119,6 +119,14 @@ function startBot() {
             }).catch(() => process.exit(1));
         } else {
             console.error(`⚠️ [ID: ${INSTANCE_ID}] Polling Error:`, error.message);
+
+            // Auto-restart polling if it stops unexpectedly (not 409)
+            if (!bot.isPolling()) {
+                console.log(`📡 [ID: ${INSTANCE_ID}] Polling to'xtagan, qayta ulanishga harakat qilinmoqda...`);
+                setTimeout(() => {
+                    bot.startPolling().catch(e => console.error('Restart Polling failed:', e.message));
+                }, 5000);
+            }
         }
     });
 
@@ -167,8 +175,19 @@ function startBot() {
     });
 
     // Heartbeat Log (Every 60 seconds for debugging)
-    setInterval(() => {
-        console.log(`💓 [ID: ${INSTANCE_ID}] Bot holati - OK (Polling: ${bot.isPolling()})`);
+    setInterval(async () => {
+        const isPolling = bot.isPolling();
+        console.log(`💓 [ID: ${INSTANCE_ID}] Bot holati - OK (Polling: ${isPolling})`);
+
+        if (!isPolling) {
+            console.warn(`⚠️ [ID: ${INSTANCE_ID}] Bot polling to'xtab qolgan!`);
+            try {
+                await bot.startPolling();
+                console.log(`📡 [ID: ${INSTANCE_ID}] Polling muvaffaqiyatli qayta tiklandi.`);
+            } catch (e) {
+                console.error(`❌ [ID: ${INSTANCE_ID}] Pollingni tiklab bo'lmadi:`, e.message);
+            }
+        }
     }, 60000);
 
     const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
@@ -296,218 +315,222 @@ function startBot() {
 
     // 2. Handle Text Messages
     bot.on('message', async (msg) => {
-        const chatId = msg.chat.id;
-        const text = msg.text;
-        const user = msg.from ? `@${msg.from.username || msg.from.first_name}` : 'Unknown';
+        try {
+            const chatId = msg.chat.id;
+            const text = msg.text;
+            const user = msg.from ? `@${msg.from.username || msg.from.first_name}` : 'Unknown';
 
-        // Update User info in DB
-        await getUser(chatId, {
-            username: msg.from?.username || '',
-            first_name: msg.from?.first_name || '',
-            last_name: msg.from?.last_name || ''
-        });
-
-        console.log(`📩 [ID: ${INSTANCE_ID}] Message from ${user}: ${text || '[Media]'}`);
-
-        const lang = await getLang(chatId);
-
-        // --- GLOBAL COMMAND INTERRUPTS --- (Allow escape from any state)
-        if (text && text.startsWith('/')) {
-            // Let the bot.onText handlers handle commands
-            return;
-        }
-
-        if (text === getText(lang, 'menu_back')) {
-            await setUserState(chatId, STATES.MAIN);
-            setRequest(chatId, null);
-            setBroadcastContent(chatId, null);
-            bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
-            return;
-        }
-
-        // Check if it's any of the main menu buttons to allow switching modes
-        const menuKeys = ['menu_music', 'menu_video', 'menu_image', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
-        let matchedMenu = false;
-        for (const key of menuKeys) {
-            if (isCommand(text, key)) {
-                matchedMenu = true;
-                break;
-            }
-        }
-
-        // If it's a menu button and not in a state that specifically MUST handle text
-        if (matchedMenu) {
-            // Let the Menu Commands section below handle it
-            // This allows an admin to click "Settings" or "Back" to exit broadcast mode
-        } else {
-            // STRIKE CHECKS (Block Middleware)
-            if (isUserBlocked(chatId)) {
-                bot.sendMessage(chatId, getText(lang, 'user_blocked'));
-                return;
-            }
-        }
-
-        if (!text) return;
-
-        // --- BROADCAST HANDLING ---
-        if (await getUserState(chatId) === STATES.WAITING_BROADCAST && isAdmin(chatId)) {
-            // Get existing target if any, default to users
-            const existingContent = getBroadcastContent(chatId) || {};
-            const target = existingContent.target || 'users';
-
-            // Instead of sending, ask for confirmation
-            await setBroadcastContent(chatId, { text, target });
-            await setUserState(chatId, STATES.WAITING_BROADCAST_CONFIRM);
-
-            const targetText = target === 'users' ? "FOYDALANUVCHILARGA" : "GURUHLARGA";
-            bot.sendMessage(chatId, `📑 **Xabar ko'rinishi:**\n\n${text}\n\n⚠️ **Haqiqatdan ham hamma ${targetText} yubormoqchimisiz?**`, {
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: "✅ Ha, yuborilsin (Send)", callback_data: 'confirm_broadcast' }],
-                        [{ text: "❌ Bekor qilish (Cancel)", callback_data: 'cancel_broadcast' }]
-                    ]
-                }
+            // Update User info in DB
+            await getUser(chatId, {
+                username: msg.from?.username || '',
+                first_name: msg.from?.first_name || '',
+                last_name: msg.from?.last_name || ''
             });
-            return;
-        }
 
-        // --- MENU COMMANDS ---
-        if (isCommand(text, 'menu_music')) {
-            await setUserState(chatId, STATES.WAITING_MUSIC);
-            bot.sendMessage(chatId, getText(lang, 'prompt_music'), getBackMenu(lang));
-            return;
-        }
+            console.log(`📩 [ID: ${INSTANCE_ID}] Message from ${user}: ${text || '[Media]'}`);
 
-        if (isCommand(text, 'menu_video')) {
-            await setUserState(chatId, STATES.WAITING_VIDEO);
-            bot.sendMessage(chatId, getText(lang, 'prompt_video'), getBackMenu(lang));
-            return;
-        }
+            const lang = await getLang(chatId);
 
-        if (isCommand(text, 'menu_image')) {
-            await setUserState(chatId, STATES.WAITING_IMAGE);
-            bot.sendMessage(chatId, getText(lang, 'prompt_image'), getBackMenu(lang));
-            return;
-        }
-
-
-        if (isCommand(text, 'menu_help')) {
-            bot.sendMessage(chatId, getText(lang, 'help_text'), getMainMenu(lang));
-            return;
-        }
-
-
-        // --- GLOBAL COMMANDS ---
-
-        if (isCommand(text, 'menu_back')) {
-            await setUserState(chatId, STATES.MAIN);
-            setRequest(chatId, null);
-            bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
-            return;
-        }
-
-        if (isCommand(text, 'menu_share')) {
-            const escapedUsername = botUsername.replace(/_/g, '\\_');
-            const shareText = getText(lang, 'share_text').replace('{username}', escapedUsername);
-
-            // Clean text for the URL (remove markdown symbols)
-            const cleanShareText = getText(lang, 'share_text')
-                .replace('{username}', botUsername)
-                .replace(/\*\*/g, '')
-                .replace(/__/g, '');
-
-            const shareLink = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${encodeURIComponent(cleanShareText)}`;
-
-            bot.sendMessage(chatId, shareText, {
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [[{ text: getText(lang, 'btn_share'), url: shareLink }]]
-                }
-            });
-            return;
-        }
-
-        // Check if we are in WAITING_BROADCAST_CONFIRM and received text (ignore it)
-        if (await getUserState(chatId) === STATES.WAITING_BROADCAST_CONFIRM) {
-            return;
-        }
-
-        // --- SMART HANDLING (MAIN STATE) ---
-        const state = await getUserState(chatId);
-
-        if (state === STATES.WAITING_VIDEO) {
-            await processUrl(chatId, text, 'video');
-            return;
-        }
-
-        if (state === STATES.WAITING_IMAGE) {
-            await processUrl(chatId, text, 'photo');
-            return;
-        }
-
-        // 1. Check if URL -> Video Download
-        if (text.match(/https?:\/\//)) {
-            // debugSend removed here because processUrl sends its own status
-            processUrl(chatId, text, 'video');
-            return;
-        }
-
-        // 2. If Text -> Music Search
-        const safety = checkText(text);
-        if (!safety.safe) {
-            const strikeData = addStrike(chatId);
-            debugSend(chatId, getText(lang, 'warning_adult'));
-            debugSend(chatId, getText(lang, 'warning_strike').replace('{count}', strikeData.count));
-            return;
-        }
-
-        debugSend(chatId, getText(lang, 'searching'), { disable_notification: true });
-
-        // Non-blocking search
-        const searchQuery = `${text} audio`;
-
-        searchMusic(searchQuery, 50).then(output => {
-            const entries = output.entries || (Array.isArray(output) ? output : [output]);
-
-            if (!entries || entries.length === 0) {
-                bot.sendMessage(chatId, getText(lang, 'not_found'), getMainMenu(lang));
+            // --- GLOBAL COMMAND INTERRUPTS --- (Allow escape from any state)
+            if (text && text.startsWith('/')) {
+                // Let the bot.onText handlers handle commands
                 return;
             }
 
-            const searchKeyboard = [];
-            const pageResults = entries.slice(0, 10);
-
-            pageResults.forEach((entry, index) => {
-                const title = entry.title.substring(0, 50);
-                const videoId = entry.id;
-
-                let durationStr = '';
-                if (entry.duration) {
-                    const date = new Date(0);
-                    date.setSeconds(entry.duration);
-                    const timeString = date.toISOString().substr(14, 5);
-                    durationStr = ` (${timeString})`;
-                }
-                searchKeyboard.push([{ text: `${index + 1}. ${title}${durationStr}`, callback_data: `sel_${videoId}` }]);
-            });
-
-            // Add Control Row (Delete and Next)
-            const controlRow = [{ text: "❌", callback_data: "del_search" }];
-            if (entries.length > 10) {
-                setResults(chatId, { total: entries, page: 1 });
-                controlRow.push({ text: "➡️", callback_data: `next_results` });
+            if (text === getText(lang, 'menu_back')) {
+                await setUserState(chatId, STATES.MAIN);
+                setRequest(chatId, null);
+                setBroadcastContent(chatId, null);
+                bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
+                return;
             }
-            searchKeyboard.push(controlRow);
 
-            debugSend(chatId, `🎶 **Natijalar:**`, {
-                parse_mode: 'Markdown',
-                reply_markup: { inline_keyboard: searchKeyboard }
+            // Check if it's any of the main menu buttons to allow switching modes
+            const menuKeys = ['menu_music', 'menu_video', 'menu_image', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
+            let matchedMenu = false;
+            for (const key of menuKeys) {
+                if (isCommand(text, key)) {
+                    matchedMenu = true;
+                    break;
+                }
+            }
+
+            // If it's a menu button and not in a state that specifically MUST handle text
+            if (matchedMenu) {
+                // Let the Menu Commands section below handle it
+                // This allows an admin to click "Settings" or "Back" to exit broadcast mode
+            } else {
+                // STRIKE CHECKS (Block Middleware)
+                if (isUserBlocked(chatId)) {
+                    bot.sendMessage(chatId, getText(lang, 'user_blocked'));
+                    return;
+                }
+            }
+
+            if (!text) return;
+
+            // --- BROADCAST HANDLING ---
+            if (await getUserState(chatId) === STATES.WAITING_BROADCAST && isAdmin(chatId)) {
+                // Get existing target if any, default to users
+                const existingContent = getBroadcastContent(chatId) || {};
+                const target = existingContent.target || 'users';
+
+                // Instead of sending, ask for confirmation
+                await setBroadcastContent(chatId, { text, target });
+                await setUserState(chatId, STATES.WAITING_BROADCAST_CONFIRM);
+
+                const targetText = target === 'users' ? "FOYDALANUVCHILARGA" : "GURUHLARGA";
+                bot.sendMessage(chatId, `📑 **Xabar ko'rinishi:**\n\n${text}\n\n⚠️ **Haqiqatdan ham hamma ${targetText} yubormoqchimisiz?**`, {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: "✅ Ha, yuborilsin (Send)", callback_data: 'confirm_broadcast' }],
+                            [{ text: "❌ Bekor qilish (Cancel)", callback_data: 'cancel_broadcast' }]
+                        ]
+                    }
+                });
+                return;
+            }
+
+            // --- MENU COMMANDS ---
+            if (isCommand(text, 'menu_music')) {
+                await setUserState(chatId, STATES.WAITING_MUSIC);
+                bot.sendMessage(chatId, getText(lang, 'prompt_music'), getBackMenu(lang));
+                return;
+            }
+
+            if (isCommand(text, 'menu_video')) {
+                await setUserState(chatId, STATES.WAITING_VIDEO);
+                bot.sendMessage(chatId, getText(lang, 'prompt_video'), getBackMenu(lang));
+                return;
+            }
+
+            if (isCommand(text, 'menu_image')) {
+                await setUserState(chatId, STATES.WAITING_IMAGE);
+                bot.sendMessage(chatId, getText(lang, 'prompt_image'), getBackMenu(lang));
+                return;
+            }
+
+
+            if (isCommand(text, 'menu_help')) {
+                bot.sendMessage(chatId, getText(lang, 'help_text'), getMainMenu(lang));
+                return;
+            }
+
+
+            // --- GLOBAL COMMANDS ---
+
+            if (isCommand(text, 'menu_back')) {
+                await setUserState(chatId, STATES.MAIN);
+                setRequest(chatId, null);
+                bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
+                return;
+            }
+
+            if (isCommand(text, 'menu_share')) {
+                const escapedUsername = botUsername.replace(/_/g, '\\_');
+                const shareText = getText(lang, 'share_text').replace('{username}', escapedUsername);
+
+                // Clean text for the URL (remove markdown symbols)
+                const cleanShareText = getText(lang, 'share_text')
+                    .replace('{username}', botUsername)
+                    .replace(/\*\*/g, '')
+                    .replace(/__/g, '');
+
+                const shareLink = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${encodeURIComponent(cleanShareText)}`;
+
+                bot.sendMessage(chatId, shareText, {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [[{ text: getText(lang, 'btn_share'), url: shareLink }]]
+                    }
+                });
+                return;
+            }
+
+            // Check if we are in WAITING_BROADCAST_CONFIRM and received text (ignore it)
+            if (await getUserState(chatId) === STATES.WAITING_BROADCAST_CONFIRM) {
+                return;
+            }
+
+            // --- SMART HANDLING (MAIN STATE) ---
+            const state = await getUserState(chatId);
+
+            if (state === STATES.WAITING_VIDEO) {
+                await processUrl(chatId, text, 'video');
+                return;
+            }
+
+            if (state === STATES.WAITING_IMAGE) {
+                await processUrl(chatId, text, 'photo');
+                return;
+            }
+
+            // 1. Check if URL -> Video Download
+            if (text.match(/https?:\/\//)) {
+                // debugSend removed here because processUrl sends its own status
+                processUrl(chatId, text, 'video');
+                return;
+            }
+
+            // 2. If Text -> Music Search
+            const safety = checkText(text);
+            if (!safety.safe) {
+                const strikeData = addStrike(chatId);
+                debugSend(chatId, getText(lang, 'warning_adult'));
+                debugSend(chatId, getText(lang, 'warning_strike').replace('{count}', strikeData.count));
+                return;
+            }
+
+            debugSend(chatId, getText(lang, 'searching'), { disable_notification: true });
+
+            // Non-blocking search
+            const searchQuery = `${text} audio`;
+
+            searchMusic(searchQuery, 50).then(output => {
+                const entries = output.entries || (Array.isArray(output) ? output : [output]);
+
+                if (!entries || entries.length === 0) {
+                    bot.sendMessage(chatId, getText(lang, 'not_found'), getMainMenu(lang));
+                    return;
+                }
+
+                const searchKeyboard = [];
+                const pageResults = entries.slice(0, 10);
+
+                pageResults.forEach((entry, index) => {
+                    const title = entry.title.substring(0, 50);
+                    const videoId = entry.id;
+
+                    let durationStr = '';
+                    if (entry.duration) {
+                        const date = new Date(0);
+                        date.setSeconds(entry.duration);
+                        const timeString = date.toISOString().substr(14, 5);
+                        durationStr = ` (${timeString})`;
+                    }
+                    searchKeyboard.push([{ text: `${index + 1}. ${title}${durationStr}`, callback_data: `sel_${videoId}` }]);
+                });
+
+                // Add Control Row (Delete and Next)
+                const controlRow = [{ text: "❌", callback_data: "del_search" }];
+                if (entries.length > 10) {
+                    setResults(chatId, { total: entries, page: 1 });
+                    controlRow.push({ text: "➡️", callback_data: `next_results` });
+                }
+                searchKeyboard.push(controlRow);
+
+                debugSend(chatId, `🎶 **Natijalar:**`, {
+                    parse_mode: 'Markdown',
+                    reply_markup: { inline_keyboard: searchKeyboard }
+                });
+            }).catch(err => {
+                console.error(err);
+                debugSend(chatId, getText(lang, 'error'), getMainMenu(lang));
             });
-        }).catch(err => {
-            console.error(err);
-            debugSend(chatId, getText(lang, 'error'), getMainMenu(lang));
-        });
+        } catch (error) {
+            console.error('⚠️ Global Message Handler Error:', error);
+        }
     });
 
     // 3. Helpers: Process URL & Action Loop
@@ -547,11 +570,12 @@ function startBot() {
             const safeTitle = cleanFilename(title);
 
             // Detection: Is it a photo?
-            // Pinterest images, X photos, etc.
+            // Pinterest images, X photos, Facebook photos etc.
             const isPinterestImage = url.includes('pinterest.com') && (!info.video_ext || info.video_ext === 'none');
             const isXImage = (url.includes('x.com') || url.includes('twitter.com')) && (!info.video_ext || info.video_ext === 'none') && (info.url && info.url.match(/\.(jpg|jpeg|png|webp)/i));
+            const isFBImage = url.includes('facebook.com') && url.includes('/photo') && (!info.video_ext || info.video_ext === 'none');
 
-            const isPhoto = isPinterestImage || isXImage;
+            const isPhoto = isPinterestImage || isXImage || isFBImage;
             const type = isPhoto ? 'photo' : 'video';
 
             await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
@@ -589,278 +613,189 @@ function startBot() {
 
     // 4. Handle Callbacks
     bot.on('callback_query', async (query) => {
-        const chatId = query.message.chat.id;
-        const data = query.data;
+        try {
+            const chatId = query.message.chat.id;
+            const data = query.data;
 
-        // Update User info on Callback
-        if (query.from) {
-            await getUser(chatId, {
-                username: query.from.username || '',
-                first_name: query.from.first_name || '',
-                last_name: query.from.last_name || ''
-            });
-        }
+            // Update User info on Callback
+            if (query.from) {
+                await getUser(chatId, {
+                    username: query.from.username || '',
+                    first_name: query.from.first_name || '',
+                    last_name: query.from.last_name || ''
+                });
+            }
 
-        // Always answer immediately to stop the button loading animation
-        // Always answer immediately to stop the button loading animation
-        const lang = await getLang(chatId);
-        try { await bot.answerCallbackQuery(query.id, { text: getText(lang, 'processing') }); } catch (e) { }
+            // Always answer immediately to stop the button loading animation
+            const lang = await getLang(chatId);
+            try { await bot.answerCallbackQuery(query.id, { text: getText(lang, 'processing') }); } catch (e) { }
 
 
-        // const lang = getLang(chatId); // Removed as we use await above
-
-        // --- ADMIN CALLBACKS ---
-        if (data.startsWith('admin_')) {
-            if (!isAdmin(chatId)) return;
-
-            if (data === 'admin_stats') {
-                const allUsers = await getAllUsers();
-                const userCount = Object.keys(allUsers).length;
-                bot.sendMessage(chatId, `📊 **Statistika:**\n\nJami foydalanuvchilar: ${userCount}`, { parse_mode: 'Markdown' });
-            } else if (data === 'admin_broadcast_users' || data === 'admin_broadcast_groups') {
-                const target = data === 'admin_broadcast_users' ? 'users' : 'groups';
-                await setUserState(chatId, STATES.WAITING_BROADCAST);
-                await setBroadcastContent(chatId, { target }); // Store target type
-
-                const targetText = target === 'users' ? "foydalanuvchilarga" : "guruhlarga";
-                bot.sendMessage(chatId, `📝 **Hamma ${targetText} yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun menyudan boshqa bo'limni tanlang)`, { parse_mode: 'Markdown' });
-            } else if (data === 'confirm_broadcast' || data === 'cancel_broadcast') {
+            // --- ADMIN CALLBACKS ---
+            if (data.startsWith('admin_')) {
                 if (!isAdmin(chatId)) return;
 
-                if (data === 'cancel_broadcast') {
-                    await setBroadcastContent(chatId, null);
-                    await setUserState(chatId, STATES.MAIN);
-                    bot.editMessageText("❌ **Broadcast bekor qilindi.**", { chat_id: chatId, message_id: query.message.message_id });
-                    bot.sendMessage(chatId, getText(lang, 'main_menu'), getMainMenu(lang));
-                    return;
-                }
+                if (data === 'admin_stats') {
+                    const allUsers = await getAllUsers();
+                    const userCount = Object.keys(allUsers).length;
+                    bot.sendMessage(chatId, `📊 **Statistika:**\n\nJami foydalanuvchilar: ${userCount}`, { parse_mode: 'Markdown' });
+                } else if (data === 'admin_broadcast_users' || data === 'admin_broadcast_groups') {
+                    const target = data === 'admin_broadcast_users' ? 'users' : 'groups';
+                    await setUserState(chatId, STATES.WAITING_BROADCAST);
+                    await setBroadcastContent(chatId, { target }); // Store target type
 
-                const content = getBroadcastContent(chatId);
-                if (!content || !content.text) {
-                    bot.sendMessage(chatId, "⚠️ Xato: Xabar mazmuni topilmadi.");
-                    return;
-                }
+                    const targetText = target === 'users' ? "foydalanuvchilarga" : "guruhlarga";
+                    bot.sendMessage(chatId, `📝 **Hamma ${targetText} yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun menyudan boshqa bo'limni tanlang)`, { parse_mode: 'Markdown' });
+                } else if (data === 'confirm_broadcast' || data === 'cancel_broadcast') {
+                    if (!isAdmin(chatId)) return;
 
-                const target = content.target || 'users';
-                const targetText = target === 'users' ? "Foydalanuvchilarga" : "Guruhlarga";
-                bot.editMessageText(`🚀 **${targetText} broadcast boshlandi...**`, { chat_id: chatId, message_id: query.message.message_id });
-
-                const allUsers = await getAllUsers();
-                const userIds = Object.keys(allUsers).filter(id => {
-                    const numericId = parseInt(id);
-                    return target === 'users' ? numericId > 0 : numericId < 0;
-                });
-
-                let sentCount = 0;
-                let failCount = 0;
-                const broadcastRecipients = [];
-
-                for (const id of userIds) {
-                    try {
-                        const sentMsg = await bot.sendMessage(id, content.text);
-                        sentCount++;
-                        broadcastRecipients.push({ chatId: id, messageId: sentMsg.message_id });
-                    } catch (err) {
-                        failCount++;
+                    if (data === 'cancel_broadcast') {
+                        await setBroadcastContent(chatId, null);
+                        await setUserState(chatId, STATES.MAIN);
+                        bot.editMessageText("❌ **Broadcast bekor qilindi.**", { chat_id: chatId, message_id: query.message.message_id });
+                        bot.sendMessage(chatId, getText(lang, 'main_menu'), getMainMenu(lang));
+                        return;
                     }
-                }
 
-                await saveBroadcast(content.text, broadcastRecipients);
-                await setBroadcastContent(chatId, null);
-                await setUserState(chatId, STATES.MAIN);
-                bot.sendMessage(chatId, `✅ **Broadcast yakunlandi.**\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`, getMainMenu(lang));
-
-            } else if (data === 'admin_recall') {
-                const lastBroadcast = await getLastBroadcast();
-                if (!lastBroadcast || !lastBroadcast.recipients || lastBroadcast.recipients.length === 0) {
-                    bot.sendMessage(chatId, "⚠️ **O'chirish uchun xabarlar topilmadi.**\n(Faqat oxirgi yuborilgan xabarni o'chirish mumkin)");
-                    return;
-                }
-
-                bot.sendMessage(chatId, `⏳ **Xabarlar o'chirilmoqda...** (${lastBroadcast.recipients.length} ta xabar)`);
-
-                let deletedCount = 0;
-                let errorCount = 0;
-
-                for (const item of lastBroadcast.recipients) {
-                    try {
-                        await bot.deleteMessage(item.chatId, item.messageId);
-                        deletedCount++;
-                    } catch (e) {
-                        errorCount++;
+                    const content = getBroadcastContent(chatId);
+                    if (!content || !content.text) {
+                        bot.sendMessage(chatId, "⚠️ Xato: Xabar mazmuni topilmadi.");
+                        return;
                     }
-                }
 
-                // Clear the file after recall
-                await saveBroadcast(null, []);
+                    const target = content.target || 'users';
+                    const targetText = target === 'users' ? "Foydalanuvchilarga" : "Guruhlarga";
+                    bot.editMessageText(`🚀 **${targetText} broadcast boshlandi...**`, { chat_id: chatId, message_id: query.message.message_id });
 
-                bot.sendMessage(chatId, `✅ **Xabarlar o'chirildi!**\n\n🟢 O'chirildi: ${deletedCount}\n🔴 Xatolik (allaqachon o'chirilgan yoki topilmadi): ${errorCount}`);
-
-            } else if (data === 'admin_users') {
-                const allUsers = await getAllUsers();
-                const userEntries = Object.entries(allUsers);
-
-                if (userEntries.length === 0) {
-                    bot.sendMessage(chatId, "⚠️ **Foydalanuvchilar bazasi hozircha bo'sh.**\nBotdan foydalanuvchilar ko'payishi bilan bu yerda paydo bo'ladi.", { parse_mode: 'Markdown' });
-                } else {
-                    let userList = "👥 **Foydalanuvchilar ro'yxati:**\n\n";
-                    userEntries.slice(0, 50).forEach(([id, u], i) => {
-                        // Safe extraction of properties
-                        const uname = u.username || '';
-                        const fname = u.first_name || '';
-                        const lname = u.last_name || '';
-
-                        // Combine names and escape markdown
-                        let displayName = (fname + ' ' + lname).trim();
-                        if (!displayName) displayName = 'Noma\'lum';
-
-                        // Clean for MarkdownV2/Stable Markdown
-                        const safeName = displayName.replace(/[_*`[\]()]/g, '\\$&');
-                        const safeUname = uname ? ` (@${uname.replace(/[_*`[\]()]/g, '\\$&')})` : '';
-
-                        userList += `${i + 1}. \`${id}\` ${safeName}${safeUname}\n`;
+                    const allUsers = await getAllUsers();
+                    const userIds = Object.keys(allUsers).filter(id => {
+                        const numericId = parseInt(id);
+                        return target === 'users' ? numericId > 0 : numericId < 0;
                     });
 
-                    if (userEntries.length > 50) userList += "\n...va yana ko'plab foydalanuvchilar.";
+                    let sentCount = 0;
+                    let failCount = 0;
+                    const broadcastRecipients = [];
 
-                    try {
-                        await bot.sendMessage(chatId, userList, { parse_mode: 'Markdown' });
-                    } catch (sendErr) {
-                        console.error('Failed to send user list:', sendErr);
-                        bot.sendMessage(chatId, "❌ **Xatolik:** Foydalanuvchilar ro'yxatini yuborib bo'lmadi. Ma'lumot juda ko'p yoki formatlashda xato bor.");
+                    for (const id of userIds) {
+                        try {
+                            const sentMsg = await bot.sendMessage(id, content.text);
+                            sentCount++;
+                            broadcastRecipients.push({ chatId: id, messageId: sentMsg.message_id });
+                        } catch (err) {
+                            failCount++;
+                        }
                     }
+
+                    await saveBroadcast(content.text, broadcastRecipients);
+                    await setBroadcastContent(chatId, null);
+                    await setUserState(chatId, STATES.MAIN);
+                    bot.sendMessage(chatId, `✅ **Broadcast yakunlandi.**\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`, getMainMenu(lang));
+
+                } else if (data === 'admin_recall') {
+                    const lastBroadcast = await getLastBroadcast();
+                    if (!lastBroadcast || !lastBroadcast.recipients || lastBroadcast.recipients.length === 0) {
+                        bot.sendMessage(chatId, "⚠️ **O'chirish uchun xabarlar topilmadi.**\n(Faqat oxirgi yuborilgan xabarni o'chirish mumkin)");
+                        return;
+                    }
+
+                    bot.sendMessage(chatId, `⏳ **Xabarlar o'chirilmoqda...** (${lastBroadcast.recipients.length} ta xabar)`);
+
+                    let deletedCount = 0;
+                    let errorCount = 0;
+
+                    for (const item of lastBroadcast.recipients) {
+                        try {
+                            await bot.deleteMessage(item.chatId, item.messageId);
+                            deletedCount++;
+                        } catch (e) {
+                            errorCount++;
+                        }
+                    }
+
+                    // Clear the file after recall
+                    await saveBroadcast(null, []);
+
+                    bot.sendMessage(chatId, `✅ **Xabarlar o'chirildi!**\n\n🟢 O'chirildi: ${deletedCount}\n🔴 Xatolik (allaqachon o'chirilgan yoki topilmadi): ${errorCount}`);
+
+                } else if (data === 'admin_users') {
+                    const allUsers = await getAllUsers();
+                    const userEntries = Object.entries(allUsers);
+
+                    if (userEntries.length === 0) {
+                        bot.sendMessage(chatId, "⚠️ **Foydalanuvchilar bazasi hozircha bo'sh.**\nBotdan foydalanuvchilar ko'payishi bilan bu yerda paydo bo'ladi.", { parse_mode: 'Markdown' });
+                    } else {
+                        let userList = "👥 **Foydalanuvchilar ro'yxati:**\n\n";
+                        userEntries.slice(0, 50).forEach(([id, u], i) => {
+                            // Safe extraction of properties
+                            const uname = u.username || '';
+                            const fname = u.first_name || '';
+                            const lname = u.last_name || '';
+
+                            // Combine names and escape markdown
+                            let displayName = (fname + ' ' + lname).trim();
+                            if (!displayName) displayName = 'Noma\'lum';
+
+                            // Clean for MarkdownV2/Stable Markdown
+                            const safeName = displayName.replace(/[_*`[\]()]/g, '\\$&');
+                            const safeUname = uname ? ` (@${uname.replace(/[_*`[\]()]/g, '\\$&')})` : '';
+
+                            userList += `${i + 1}. \`${id}\` ${safeName}${safeUname}\n`;
+                        });
+
+                        if (userEntries.length > 50) userList += "\n...va yana ko'plab foydalanuvchilar.";
+
+                        try {
+                            await bot.sendMessage(chatId, userList, { parse_mode: 'Markdown' });
+                        } catch (sendErr) {
+                            console.error('Failed to send user list:', sendErr);
+                            bot.sendMessage(chatId, "❌ **Xatolik:** Foydalanuvchilar ro'yxatini yuborib bo'lmadi. Ma'lumot juda ko'p yoki formatlashda xato bor.");
+                        }
+                    }
+                } else if (data === 'admin_close') {
+                    bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
                 }
-            } else if (data === 'admin_close') {
-                bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
-            }
-            return;
-        }
-
-        // --- LANGUAGE SELECTION ---
-        if (data.startsWith('lang_')) {
-            const selectedLang = data.replace('lang_', '');
-            await setLang(chatId, selectedLang);
-            bot.sendMessage(chatId, getText(selectedLang, 'welcome'), {
-                parse_mode: 'Markdown',
-                ...getMainMenu(selectedLang)
-            });
-            return;
-        }
-
-        // --- PAGINATION ---
-        if (data === 'next_results' || data === 'prev_results') {
-            const results = getResults(chatId);
-            if (!results) return;
-
-            let { total, page } = results;
-            if (data === 'next_results') {
-                page += 1;
-            } else {
-                page -= 1;
-            }
-
-            const startLimit = (page - 1) * 10;
-            const currentBatch = total.slice(startLimit, startLimit + 10);
-
-            if (currentBatch.length === 0) {
-                bot.answerCallbackQuery(query.id, { text: "Boshqa natija yo'q" });
                 return;
             }
 
-            // Update state
-            setResults(chatId, { total, page });
-
-            const searchKeyboard = [];
-            currentBatch.forEach((entry, index) => {
-                const title = entry.title.substring(0, 50);
-                const videoId = entry.id;
-                let durationStr = '';
-                if (entry.duration) {
-                    const date = new Date(0);
-                    date.setSeconds(entry.duration);
-                    const timeString = date.toISOString().substr(14, 5);
-                    durationStr = ` (${timeString})`;
-                }
-                searchKeyboard.push([{ text: `${startLimit + index + 1}. ${title}${durationStr}`, callback_data: `sel_${videoId}` }]);
-            });
-
-            // Control Row
-            const controlRow = [];
-            if (page > 1) {
-                controlRow.push({ text: "⬅️", callback_data: "prev_results" });
-            }
-
-            controlRow.push({ text: "❌", callback_data: "del_search" });
-
-            if (total.length > page * 10) {
-                controlRow.push({ text: "➡️", callback_data: "next_results" });
-            }
-
-            searchKeyboard.push(controlRow);
-
-            bot.editMessageReplyMarkup({ inline_keyboard: searchKeyboard }, { chat_id: chatId, message_id: query.message.message_id });
-            return;
-        }
-
-        // --- DELETE SEARCH ---
-        if (data === 'del_search') {
-            bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
-            return;
-        }
-
-        // --- SEARCH SELECTION ---
-        if (data.startsWith('sel_')) {
-            const videoId = data.replace('sel_', '');
-            const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-            bot.sendMessage(chatId, getText(lang, 'downloading'));
-
-            // Start "uploading audio" action loop
-            const stopAction = sendActionLoop(chatId, 'upload_voice');
-
-            // Auto-download Audio for music search
-            handleDownload(chatId, videoUrl, 'audio', { outputPath: 'temp' }, null, {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: getText(lang, 'search_again'), callback_data: 'reset_music' }],
-                    ]
-                }
-            })
-                .finally(() => {
-                    stopAction(); // Stop the action loop
+            // --- LANGUAGE SELECTION ---
+            if (data.startsWith('lang_')) {
+                const selectedLang = data.replace('lang_', '');
+                await setLang(chatId, selectedLang);
+                bot.sendMessage(chatId, getText(selectedLang, 'welcome'), {
+                    parse_mode: 'Markdown',
+                    ...getMainMenu(selectedLang)
                 });
-            return;
-        }
+                return;
+            }
 
-        // --- RESET MUSIC ---
-        if (data === 'reset_music') {
-            await setUserState(chatId, STATES.WAITING_MUSIC);
-            debugSend(chatId, getText(lang, 'prompt_music'), getBackMenu(lang));
-            return;
-        }
+            // --- PAGINATION ---
+            if (data === 'next_results' || data === 'prev_results') {
+                const results = getResults(chatId);
+                if (!results) return;
 
-        // --- SEARCH FROM SHAZAM ---
-        if (data.startsWith('search_')) {
-            const queryText = data.replace('search_', '');
+                let { total, page } = results;
+                if (data === 'next_results') {
+                    page += 1;
+                } else {
+                    page -= 1;
+                }
 
-            // Inject into search flow
-            await setUserState(chatId, STATES.WAITING_MUSIC);
-            debugSend(chatId, getText(lang, 'searching'));
+                const startLimit = (page - 1) * 10;
+                const currentBatch = total.slice(startLimit, startLimit + 10);
 
-            const stopAction = sendActionLoop(chatId, 'typing'); // Search might take a moment
-
-            // Use searchMusic to ensure we get the song, not a reaction/loop
-            searchMusic(queryText, 50).then(output => {
-                const entries = output.entries || (Array.isArray(output) ? output : [output]);
-                if (!entries || entries.length === 0) {
-                    debugSend(chatId, getText(lang, 'not_found'), getBackMenu(lang));
+                if (currentBatch.length === 0) {
+                    bot.answerCallbackQuery(query.id, { text: "Boshqa natija yo'q" });
                     return;
                 }
-                const searchKeyboard = [];
-                const pageResults = entries.slice(0, 10);
 
-                pageResults.forEach((entry, index) => {
-                    // Format Duration
+                // Update state
+                setResults(chatId, { total, page });
+
+                const searchKeyboard = [];
+                currentBatch.forEach((entry, index) => {
+                    const title = entry.title.substring(0, 50);
+                    const videoId = entry.id;
                     let durationStr = '';
                     if (entry.duration) {
                         const date = new Date(0);
@@ -868,66 +803,164 @@ function startBot() {
                         const timeString = date.toISOString().substr(14, 5);
                         durationStr = ` (${timeString})`;
                     }
-                    searchKeyboard.push([{ text: `${index + 1}. ${entry.title.substring(0, 50)}${durationStr}`, callback_data: `sel_${entry.id}` }]);
+                    searchKeyboard.push([{ text: `${startLimit + index + 1}. ${title}${durationStr}`, callback_data: `sel_${videoId}` }]);
                 });
 
-                // Add Control Row (Delete and Next)
-                const controlRow = [{ text: "❌", callback_data: "del_search" }];
-                if (entries.length > 10) {
-                    setResults(chatId, { total: entries, page: 1 });
-                    controlRow.push({ text: "➡️", callback_data: `next_results` });
+                // Control Row
+                const controlRow = [];
+                if (page > 1) {
+                    controlRow.push({ text: "⬅️", callback_data: "prev_results" });
                 }
+
+                controlRow.push({ text: "❌", callback_data: "del_search" });
+
+                if (total.length > page * 10) {
+                    controlRow.push({ text: "➡️", callback_data: "next_results" });
+                }
+
                 searchKeyboard.push(controlRow);
 
-                debugSend(chatId, `🎶 **Natijalar:**`, { reply_markup: { inline_keyboard: searchKeyboard } });
-            }).finally(() => stopAction());
-            return;
-        }
+                bot.editMessageReplyMarkup({ inline_keyboard: searchKeyboard }, { chat_id: chatId, message_id: query.message.message_id });
+                return;
+            }
+
+            // --- DELETE SEARCH ---
+            if (data === 'del_search') {
+                bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
+                return;
+            }
+
+            // --- SEARCH SELECTION ---
+            if (data.startsWith('sel_')) {
+                const videoId = data.replace('sel_', '');
+                const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+                bot.sendMessage(chatId, getText(lang, 'downloading'));
+
+                // Start "uploading audio" action loop
+                const stopAction = sendActionLoop(chatId, 'upload_voice');
+
+                // Auto-download Audio for music search
+                const options = {
+                    outputPath: path.join(DOWNLOADS_DIR, `${cleanFilename(entry.title || 'Music')}_${Date.now()}.%(ext)s`)
+                };
+
+                handleDownload(chatId, videoUrl, 'audio', options, title, {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: getText(lang, 'search_again'), callback_data: 'reset_music' }],
+                        ]
+                    }
+                })
+                    .finally(() => {
+                        stopAction(); // Stop the action loop
+                    });
+                return;
+            }
+
+            // --- RESET MUSIC ---
+            if (data === 'reset_music') {
+                await setUserState(chatId, STATES.WAITING_MUSIC);
+                debugSend(chatId, getText(lang, 'prompt_music'), getBackMenu(lang));
+                return;
+            }
+
+            // --- SEARCH FROM SHAZAM ---
+            if (data.startsWith('search_')) {
+                const queryText = data.replace('search_', '');
+
+                // Inject into search flow
+                await setUserState(chatId, STATES.WAITING_MUSIC);
+                debugSend(chatId, getText(lang, 'searching'));
+
+                const stopAction = sendActionLoop(chatId, 'typing'); // Search might take a moment
+
+                // Use searchMusic to ensure we get the song, not a reaction/loop
+                searchMusic(queryText, 50).then(output => {
+                    const entries = output.entries || (Array.isArray(output) ? output : [output]);
+                    if (!entries || entries.length === 0) {
+                        debugSend(chatId, getText(lang, 'not_found'), getBackMenu(lang));
+                        return;
+                    }
+                    const searchKeyboard = [];
+                    const pageResults = entries.slice(0, 10);
+
+                    pageResults.forEach((entry, index) => {
+                        // Format Duration
+                        let durationStr = '';
+                        if (entry.duration) {
+                            const date = new Date(0);
+                            date.setSeconds(entry.duration);
+                            const timeString = date.toISOString().substr(14, 5);
+                            durationStr = ` (${timeString})`;
+                        }
+                        searchKeyboard.push([{ text: `${index + 1}. ${entry.title.substring(0, 50)}${durationStr}`, callback_data: `sel_${entry.id}` }]);
+                    });
+
+                    // Add Control Row (Delete and Next)
+                    const controlRow = [{ text: "❌", callback_data: "del_search" }];
+                    if (entries.length > 10) {
+                        setResults(chatId, { total: entries, page: 1 });
+                        controlRow.push({ text: "➡️", callback_data: `next_results` });
+                    }
+                    searchKeyboard.push(controlRow);
+
+                    debugSend(chatId, `🎶 **Natijalar:**`, { reply_markup: { inline_keyboard: searchKeyboard } });
+                }).finally(() => stopAction());
+                return;
+            }
 
 
-        // --- DOWNLOAD SELECTION ---
-        if (data === 'cancel_req') {
-            setRequest(chatId, null);
-            bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
-            debugSend(chatId, getText(lang, 'main_menu'), getMainMenu(lang));
-            return;
-        }
+            // --- DOWNLOAD SELECTION ---
+            if (data === 'cancel_req') {
+                setRequest(chatId, null);
+                bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
+                debugSend(chatId, getText(lang, 'main_menu'), getMainMenu(lang));
+                return;
+            }
 
-        const reqData = getRequest(chatId);
-        if (!reqData) {
-            // No answerCallbackQuery needed here as it was done at top
-            return;
-        }
+            const reqData = getRequest(chatId);
+            if (!reqData) {
+                // If it's a download target but no request data, user probably clicked an old button or bot restarted
+                if (data.startsWith('target_')) {
+                    bot.sendMessage(chatId, `⚠️ **${getText(lang, 'error')}**\n\nSizning yuklash seanshingiz yakunlangan yoki eskirgan. Iltimos, havolani qaytadan yuboring.\nYour session has expired. Please send the link again.`, getMainMenu(lang));
+                }
+                return;
+            }
 
-        const { url, title } = reqData;
-        const safeTitle = cleanFilename(title);
+            const { url, title } = reqData;
+            const safeTitle = cleanFilename(title);
 
-        if (data === 'target_mp3' && query.message.video) {
-            // If from audio button on video, don't delete the video message
-        } else {
-            bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
-        }
+            if (data === 'target_mp3' && query.message.video) {
+                // If from audio button on video, don't delete the video message
+            } else {
+                bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
+            }
 
-        debugSend(chatId, getText(lang, 'downloading'));
+            debugSend(chatId, getText(lang, 'downloading'));
 
-        // Determine options
-        let type = 'video';
-        let options = { outputPath: path.join(DOWNLOADS_DIR, `${safeTitle}_${Date.now()}.%(ext)s`) };
+            // Determine options
+            let type = 'video';
+            let options = { outputPath: path.join(DOWNLOADS_DIR, `${safeTitle}_${Date.now()}.%(ext)s`) };
 
-        if (data === 'target_mp3') {
-            type = 'audio';
-        } else if (data === 'target_video') {
-            type = 'video';
-            options.height = 'best';
-        }
+            if (data === 'target_mp3') {
+                console.log(`🎵 [index] target_mp3 requested for chatId: ${chatId}, title: ${title}`);
+                type = 'audio';
+            } else if (data === 'target_video') {
+                type = 'video';
+                options.height = 'best';
+            }
 
-        const actionType = type === 'audio' ? 'upload_voice' : 'upload_video';
-        const stopAction = sendActionLoop(chatId, actionType);
+            const actionType = type === 'audio' ? 'upload_voice' : 'upload_video';
+            const stopAction = sendActionLoop(chatId, actionType);
 
-        try {
-            await handleDownload(chatId, url, type, options, title);
-        } finally {
-            stopAction();
+            try {
+                await handleDownload(chatId, url, type, options, title);
+            } finally {
+                stopAction();
+            }
+        } catch (error) {
+            console.error('⚠️ Callback Query Handler Error:', error);
         }
     });
 
@@ -970,15 +1003,15 @@ function startBot() {
 
             await fs.remove(filePath);
 
-            // Clear request after successful completion
-            setRequest(chatId, null);
-
             // After download, show Home button or Custom Menu
             const finalMenu = customMenu || getBackMenu(lang);
             debugSend(chatId, getText(lang, 'done'), finalMenu);
 
         } catch (error) {
             console.error('Download Error:', error);
+            if (error.message === 'RESTRICTED_PLATFORM_IMAGE') {
+                return debugSend(chatId, getText(lang, 'restricted_content'), getBackMenu(lang));
+            }
             let errMsg = error.message;
             if (errMsg.includes('Requested format is not available')) errMsg = "Tanlangan format mavjud emas. Iltimos, boshqa sifatni sinab ko'ring.";
             else if (errMsg.includes('Video unavailable')) errMsg = "Video topilmadi yoki o'chirib tashlangan.";
