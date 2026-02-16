@@ -24,6 +24,7 @@ const TEXTS = {
         invalid_link: "❌ **Noto'g'ri havola.**\nIltimos, to'g'ri video havolasini yuboring.",
         file_too_large: "⚠️ Fayl hajmi juda katta. Telegram orqali yuborib bo'lmaydi.",
         restricted_content: "⚠️ **Cheklov.**\nUshbu platforma (masalan, Facebook) rasm yuklashni taqiqlagan yoki rasm shaxsiy kontent hisoblanadi. Uni bot orqali yuklab bo'lmaydi.",
+        login_required: "⚠️ **Kirish talab qilinadi.**\nUshbu kontentni ko'rish yoki yuklash uchun ijtimoiy tarmoqqa kirish talab qilinadi (shaxsiy akkaunt/yopiq guruh). Bot buni yuklab bera olmaydi.",
         session_expired: "⚠️ **Seans muddati tugadi.**\nIltimos, havolani qaytadan yuboring.",
 
         done: "✅ **Tayyor! Yana nima qilamiz?**",
@@ -76,6 +77,7 @@ const TEXTS = {
         invalid_link: "❌ **Нотўғри ҳавола.**\nИлтимос, тўғри видео ҳаволасини юборинг.",
         file_too_large: "⚠️ Файл ҳажми жуда катта. Telegram орқали юбориб бўлмайди.",
         restricted_content: "⚠️ **Чеклов.**\nУшбу платформа (масалан, Facebook) расм юклашни тақиқлаган ёки расм шахсий контент ҳисобланади. Уни бот орқали юклаб бўлмайди.",
+        login_required: "⚠️ **Кириш талаб қилинади.**\nУшбу контентни кўриш ёки юклаш учун ижтимоий тармоққа кириш талаб қилинади (шахсий аккаунт/ёпиқ гуруҳ). Бот буни юклаб бера олмайди.",
         session_expired: "⚠️ **Сеанс муддати тугади.**\nИлтимос, ҳаволани қайтадан юборинг.",
 
         done: "✅ **Тайёр! Яна нима қиламиз?**",
@@ -100,7 +102,7 @@ const TEXTS = {
         user_blocked: "🚫 **Сиз блокландингиз.**\nБотдан фойдаланиш қоидалари бузилгани сабабли чеклов қўйилди.",
 
         menu_share: "📣 Ботни улашиш",
-        share_text: "🚀 **SadoMedia Bot** - YouTube, Instagram, TikTok дан видео юклаш ва мусиқалар топиш учун энг яхши ёрдамчингиз!\n\nБотни бу ерда топишингиз мумкин: @{username}",
+        share_text: "🚀 **SadoMedia Bot** - YouTube, Instagram, TikTok дан видео юклаш va мусиқалар топиш учун энг яхши ёрдамчингиз!\n\nБотни бу ерда топишингиз мумкин: @{username}",
         btn_share: "📲 Улашиш"
     },
     ru: {
@@ -128,6 +130,7 @@ const TEXTS = {
         invalid_link: "❌ **Неверная ссылка.**\nПожалуйста, отправьте правильную ссылку.",
         file_too_large: "⚠️ Файл слишком большой для отправки через Telegram.",
         restricted_content: "⚠️ **Ограничение.**\nЭта платформа (например, Facebook) запрещает загрузку изображений или это частный контент. Его нельзя скачать через бота.",
+        login_required: "⚠️ **Требуется вход.**\nДля просмотра или скачивания этого контента требуется вход в социальную сеть (личный аккаунт/закрытая группа). Бот не может это скачать.",
         session_expired: "⚠️ **Сессия истекла.**\nПожалуйста, отправьте ссылку снова.",
 
         done: "✅ **Готово! Что дальше?**",
@@ -180,6 +183,7 @@ const TEXTS = {
         invalid_link: "❌ **Invalid link.**\n\nPlease send a valid video link.",
         file_too_large: "⚠️ File is too large to send via Telegram.",
         restricted_content: "⚠️ **Platform Restriction.**\nThis platform (e.g., Facebook) restricts direct image downloads or the content is private. It cannot be downloaded via the bot.",
+        login_required: "⚠️ **Login Required.**\nViewing or downloading this content requires logging into the social network (private account/closed group). The bot cannot download this.",
         session_expired: "⚠️ **Session expired.**\nPlease send the link again.",
 
         done: "✅ **Done! What's next?**",

@@ -299,6 +299,12 @@ async function getVideoInfo(url) {
 
             const info = await youtubedl(url, flags, getYtDlpOptions());
 
+            // Check for login redirection in the final URL if available
+            // Note: some extractors might set info.webpage_url to the login page
+            if (info && info.webpage_url && (info.webpage_url.includes('facebook.com/login') || info.webpage_url.includes('instagram.com/accounts/login'))) {
+                throw new Error('LOGIN_REQUIRED');
+            }
+
             if (info && !info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
                 info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
             }
@@ -331,6 +337,9 @@ async function getVideoInfo(url) {
             return info;
         }
     } catch (e) {
+        if (e.message.includes('Unsupported URL') && (e.message.includes('facebook.com/login') || e.message.includes('instagram.com/accounts/login'))) {
+            throw new Error('LOGIN_REQUIRED');
+        }
         console.warn(`⚠️ [youtubeService] Final metadata fallback failed: ${e.message}`);
     }
 
@@ -352,13 +361,19 @@ async function getVideoInfo(url) {
         }
     }
 
-    // FACEBOOK FALLBACK
     if (url.includes('facebook.com')) {
         const fbInfo = await getFacebookInfo(url);
         if (fbInfo) {
             cache.set(cacheKey, fbInfo, 300);
             return fbInfo;
         }
+    }
+
+    // TIKTOK SLIDESHOW FALLBACK
+    if (url.includes('tiktok.com')) {
+        // TikTok slideshows often fail in yt-dlp, but we can try to extract thumbnails
+        // This is a placeholder for future robust TikTok extraction
+        // We'll let it fall through for now unless we find a reliable way
     }
 
     throw new Error('Could not fetch media metadata. Please check the link.');

@@ -14,40 +14,45 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY || 'placeholder');
 
 // Persistent User Data
 async function getUser(chatId, info = {}) {
-    const { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('chat_id', chatId)
-        .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
-        console.error('Supabase getUser Error:', error);
-    }
-
-    if (!user) {
-        const { data: newUser, error: createError } = await supabase
+    try {
+        const { data: user, error } = await supabase
             .from('users')
-            .insert([{ chat_id: chatId, lang: 'uz', state: 'MAIN', ...info }])
-            .select()
-            .single();
-
-        if (createError) console.error('Supabase createUser Error:', createError);
-        return newUser || { lang: 'uz', state: 'MAIN' };
-    }
-
-    if (Object.keys(info).length > 0) {
-        const { data: updatedUser, error: updateError } = await supabase
-            .from('users')
-            .update({ ...info, updated_at: new Date() })
+            .select('*')
             .eq('chat_id', chatId)
-            .select()
             .single();
 
-        if (updateError) console.error('Supabase updateUser Error:', updateError);
-        return updatedUser || user;
-    }
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
+            console.error('Supabase getUser Error:', error.message || error);
+        }
 
-    return user;
+        if (!user) {
+            const { data: newUser, error: createError } = await supabase
+                .from('users')
+                .insert([{ chat_id: chatId, lang: 'uz', state: 'MAIN', ...info }])
+                .select()
+                .single();
+
+            if (createError) console.error('Supabase createUser Error:', createError.message || createError);
+            return newUser || { lang: 'uz', state: 'MAIN' };
+        }
+
+        if (Object.keys(info).length > 0) {
+            const { data: updatedUser, error: updateError } = await supabase
+                .from('users')
+                .update({ ...info, updated_at: new Date() })
+                .eq('chat_id', chatId)
+                .select()
+                .single();
+
+            if (updateError) console.error('Supabase updateUser Error:', updateError.message || updateError);
+            return updatedUser || user;
+        }
+
+        return user;
+    } catch (e) {
+        console.error('⚠️ Critical Database Error (getUser):', e.message);
+        return { lang: 'uz', state: 'MAIN' }; // Safe fallback
+    }
 }
 
 async function getAllUsers() {
@@ -82,11 +87,15 @@ async function getState(chatId) {
 }
 
 async function setState(chatId, state) {
-    const { error } = await supabase
-        .from('users')
-        .update({ state, updated_at: new Date() })
-        .eq('chat_id', chatId);
-    if (error) console.error('Supabase setState Error:', error);
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ state, updated_at: new Date() })
+            .eq('chat_id', chatId);
+        if (error) console.error('Supabase setState Error:', error.message || error);
+    } catch (e) {
+        console.error('⚠️ Critical Database Error (setState):', e.message);
+    }
 }
 
 // In-memory data for transient states (Requests & Search Results)

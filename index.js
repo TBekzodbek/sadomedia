@@ -559,7 +559,18 @@ function startBot() {
             }
 
             // Fetch info to determine media type
-            const info = await getVideoInfo(url).catch(() => null);
+            let info;
+            try {
+                info = await getVideoInfo(url);
+            } catch (error) {
+                await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+                if (error.message === 'LOGIN_REQUIRED') {
+                    return debugSend(chatId, getText(lang, 'login_required'), getBackMenu(lang));
+                }
+                debugSend(chatId, getText(lang, 'error') + '\n\n' + error.message, getBackMenu(lang));
+                return;
+            }
+
             if (!info) {
                 await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
                 debugSend(chatId, getText(lang, 'error'), getBackMenu(lang));
@@ -1012,6 +1023,9 @@ function startBot() {
             console.error('Download Error:', error);
             if (error.message === 'RESTRICTED_PLATFORM_IMAGE') {
                 return debugSend(chatId, getText(lang, 'restricted_content'), getBackMenu(lang));
+            }
+            if (error.message === 'LOGIN_REQUIRED') {
+                return debugSend(chatId, getText(lang, 'login_required'), getBackMenu(lang));
             }
             let errMsg = error.message;
             if (errMsg.includes('Requested format is not available')) errMsg = "Tanlangan format mavjud emas. Iltimos, boshqa sifatni sinab ko'ring.";
