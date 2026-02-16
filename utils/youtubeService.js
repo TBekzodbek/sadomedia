@@ -229,7 +229,8 @@ async function downloadMedia(url, type, options = {}) {
                 ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best`
                 : 'best[height<=?720][ext=mp4]/best[ext=mp4]/bestvideo[height<=?720]+bestaudio/best';
         } else {
-            formatSelect = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
+            // TikTok/Instagram/Pinterest: Priority to 'best' single format (often no watermark)
+            formatSelect = 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
         }
 
         Object.assign(flags, {
