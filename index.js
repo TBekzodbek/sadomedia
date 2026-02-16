@@ -212,7 +212,8 @@ function startBot() {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: "📊 Statistika", callback_data: 'admin_stats' }],
-                    [{ text: "📢 Xabar yuborish (Broadcast)", callback_data: 'admin_broadcast' }],
+                    [{ text: "👤 Foydalanuvchilarga xabar", callback_data: 'admin_broadcast_users' }],
+                    [{ text: "👥 Guruhlarga xabar", callback_data: 'admin_broadcast_groups' }],
                     [{ text: "⬅️ Oxirgi xabarni o'chirish (Recall)", callback_data: 'admin_recall' }],
                     [{ text: "👥 Foydalanuvchilar bazasi", callback_data: 'admin_users' }],
                     [{ text: "❌ Panelni yopish", callback_data: 'admin_close' }]
@@ -312,11 +313,16 @@ function startBot() {
 
         // --- BROADCAST HANDLING ---
         if (await getUserState(chatId) === STATES.WAITING_BROADCAST && isAdmin(chatId)) {
+            // Get existing target if any, default to users
+            const existingContent = getBroadcastContent(chatId) || {};
+            const target = existingContent.target || 'users';
+
             // Instead of sending, ask for confirmation
-            await setBroadcastContent(chatId, { text });
+            await setBroadcastContent(chatId, { text, target });
             await setUserState(chatId, STATES.WAITING_BROADCAST_CONFIRM);
 
-            bot.sendMessage(chatId, `📑 **Xabar ko'rinishi:**\n\n${text}\n\n⚠️ **Haqiqatdan ham hamma foydalanuvchilarga yubormoqchimisiz?**`, {
+            const targetText = target === 'users' ? "FOYDALANUVCHILARGA" : "GURUHLARGA";
+            bot.sendMessage(chatId, `📑 **Xabar ko'rinishi:**\n\n${text}\n\n⚠️ **Haqiqatdan ham hamma ${targetText} yubormoqchimisiz?**`, {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
@@ -545,9 +551,13 @@ function startBot() {
                 const allUsers = await getAllUsers();
                 const userCount = Object.keys(allUsers).length;
                 bot.sendMessage(chatId, `📊 **Statistika:**\n\nJami foydalanuvchilar: ${userCount}`, { parse_mode: 'Markdown' });
-            } else if (data === 'admin_broadcast') {
+            } else if (data === 'admin_broadcast_users' || data === 'admin_broadcast_groups') {
+                const target = data === 'admin_broadcast_users' ? 'users' : 'groups';
                 await setUserState(chatId, STATES.WAITING_BROADCAST);
-                bot.sendMessage(chatId, "📝 **Hamma foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun menyudan boshqa bo'limni tanlang)", { parse_mode: 'Markdown' });
+                await setBroadcastContent(chatId, { target }); // Store target type
+
+                const targetText = target === 'users' ? "foydalanuvchilarga" : "guruhlarga";
+                bot.sendMessage(chatId, `📝 **Hamma ${targetText} yubormoqchi bo'lgan xabaringizni yozing:**\n(Bekor qilish uchun menyudan boshqa bo'limni tanlang)`, { parse_mode: 'Markdown' });
             } else if (data === 'confirm_broadcast' || data === 'cancel_broadcast') {
                 if (!isAdmin(chatId)) return;
 
@@ -565,10 +575,16 @@ function startBot() {
                     return;
                 }
 
-                bot.editMessageText("🚀 **Broadcast boshlandi...**", { chat_id: chatId, message_id: query.message.message_id });
+                const target = content.target || 'users';
+                const targetText = target === 'users' ? "Foydalanuvchilarga" : "Guruhlarga";
+                bot.editMessageText(`🚀 **${targetText} broadcast boshlandi...**`, { chat_id: chatId, message_id: query.message.message_id });
 
                 const allUsers = await getAllUsers();
-                const userIds = Object.keys(allUsers);
+                const userIds = Object.keys(allUsers).filter(id => {
+                    const numericId = parseInt(id);
+                    return target === 'users' ? numericId > 0 : numericId < 0;
+                });
+
                 let sentCount = 0;
                 let failCount = 0;
                 const broadcastRecipients = [];
