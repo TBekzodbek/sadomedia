@@ -430,11 +430,13 @@ function startBot() {
                 searchKeyboard.push([{ text: `${index + 1}. ${title}${durationStr}`, callback_data: `sel_${videoId}` }]);
             });
 
-            // Add Next Button if there are more than 10 results
+            // Add Control Row (Delete and Next)
+            const controlRow = [{ text: "❌", callback_data: "del_search" }];
             if (entries.length > 10) {
                 setResults(chatId, { total: entries, page: 1 });
-                searchKeyboard.push([{ text: "➡️ Keyingisi / Next", callback_data: `next_results` }]);
+                controlRow.push({ text: "➡️", callback_data: `next_results` });
             }
+            searchKeyboard.push(controlRow);
 
             debugSend(chatId, `🎶 **Natijalar:**`, {
                 parse_mode: 'Markdown',
@@ -664,21 +666,30 @@ function startBot() {
         }
 
         // --- PAGINATION ---
-        if (data === 'next_results') {
+        if (data === 'next_results' || data === 'prev_results') {
             const results = getResults(chatId);
             if (!results) return;
 
-            const { total, page } = results;
-            const startLimit = page * 10;
-            const nextBatch = total.slice(startLimit, startLimit + 10);
+            let { total, page } = results;
+            if (data === 'next_results') {
+                page += 1;
+            } else {
+                page -= 1;
+            }
 
-            if (nextBatch.length === 0) {
+            const startLimit = (page - 1) * 10;
+            const currentBatch = total.slice(startLimit, startLimit + 10);
+
+            if (currentBatch.length === 0) {
                 bot.answerCallbackQuery(query.id, { text: "Boshqa natija yo'q" });
                 return;
             }
 
+            // Update state
+            setResults(chatId, { total, page });
+
             const searchKeyboard = [];
-            nextBatch.forEach((entry, index) => {
+            currentBatch.forEach((entry, index) => {
                 const title = entry.title.substring(0, 50);
                 const videoId = entry.id;
                 let durationStr = '';
@@ -691,15 +702,27 @@ function startBot() {
                 searchKeyboard.push([{ text: `${startLimit + index + 1}. ${title}${durationStr}`, callback_data: `sel_${videoId}` }]);
             });
 
-            const hasMore = total.length > startLimit + 10;
-            if (hasMore) {
-                setResults(chatId, { total, page: page + 1 });
-                searchKeyboard.push([{ text: "➡️ Keyingisi / Next", callback_data: `next_results` }]);
-            } else {
-                setResults(chatId, null);
+            // Control Row
+            const controlRow = [];
+            if (page > 1) {
+                controlRow.push({ text: "⬅️", callback_data: "prev_results" });
             }
 
+            controlRow.push({ text: "❌", callback_data: "del_search" });
+
+            if (total.length > page * 10) {
+                controlRow.push({ text: "➡️", callback_data: "next_results" });
+            }
+
+            searchKeyboard.push(controlRow);
+
             bot.editMessageReplyMarkup({ inline_keyboard: searchKeyboard }, { chat_id: chatId, message_id: query.message.message_id });
+            return;
+        }
+
+        // --- DELETE SEARCH ---
+        if (data === 'del_search') {
+            bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
             return;
         }
 
@@ -708,7 +731,7 @@ function startBot() {
             const videoId = data.replace('sel_', '');
             const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-            bot.editMessageText(getText(lang, 'downloading'), { chat_id: chatId, message_id: query.message.message_id });
+            bot.sendMessage(chatId, getText(lang, 'downloading'));
 
             // Start "uploading audio" action loop
             const stopAction = sendActionLoop(chatId, 'upload_voice');
@@ -766,11 +789,13 @@ function startBot() {
                     searchKeyboard.push([{ text: `${index + 1}. ${entry.title.substring(0, 50)}${durationStr}`, callback_data: `sel_${entry.id}` }]);
                 });
 
-                // Add Next Button if there are more than 10 results
+                // Add Control Row (Delete and Next)
+                const controlRow = [{ text: "❌", callback_data: "del_search" }];
                 if (entries.length > 10) {
                     setResults(chatId, { total: entries, page: 1 });
-                    searchKeyboard.push([{ text: "➡️ Keyingisi / Next", callback_data: `next_results` }]);
+                    controlRow.push({ text: "➡️", callback_data: `next_results` });
                 }
+                searchKeyboard.push(controlRow);
 
                 debugSend(chatId, `🎶 **Natijalar:**`, { reply_markup: { inline_keyboard: searchKeyboard } });
             }).finally(() => stopAction());
