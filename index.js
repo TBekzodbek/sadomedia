@@ -134,8 +134,8 @@ function startBot() {
         ]).catch(err => console.error('Error setting commands:', err.message));
 
         // Set Bot Description (Long text in "What can this bot do?")
-        const descUz = "🌟 SadoMedia Bot - Ijtimoiy tarmoqlardan video va musiqalar yuklash uchun eng qulay yordamchingiz!\n\n📥 YouTube, Instagram, TikTok dan video yuklash.\n🎵 Musiqalarni nomi bo'yicha topish va yuklab olish.\n\nFoydalanish juda oson: shunchaki havola yuboring yoki musiqa nomini yozing!";
-        const descRu = "🌟 SadoMedia Bot - Ваш удобный помощник для скачивания видео и музыки из соцсетей!\n\n📥 Скачивание видео из YouTube, Instagram, TikTok.\n🎵 Поиск и скачивание музыки по названию.\n\nПользоваться очень просто: просто отправьте ссылку или название музыки!";
+        const descUz = "🌟 SadoMedia Bot - Ijtimoiy tarmoqlardan video va rasmlar yuklash uchun eng qulay yordamchingiz!\n\n📥 YouTube, Instagram, TikTok, Pinterest, Facebook, X dan video va rasmlar yuklash.\n🎵 Musiqalarni nomi bo'yicha topish va yuklab olish.\n\nFoydalanish juda oson: shunchaki havola yuboring yoki musiqa nomini yozing!";
+        const descRu = "🌟 SadoMedia Bot - Ваш удобный помощник для скачивания видео и фото из соцсетей!\n\n📥 Скачивание видео и фото из YouTube, Instagram, TikTok, Pinterest, Facebook, X.\n🎵 Поиск и скачивание музыки по названию.\n\nПользоваться очень просто: просто отправьте ссылку или название музыки!";
         const descCombined = `${descUz}\n\n---\n\n${descRu}`;
 
         bot.setMyDescription({ description: descUz, language_code: 'uz' }).catch(() => { });
@@ -143,8 +143,8 @@ function startBot() {
         bot.setMyDescription({ description: descCombined }).catch(() => { });
 
         // Set Short Description (Profile snippet)
-        const shortUz = "Video va musiqalar yuklovchi bot.";
-        const shortRu = "Бот для скачивания видео и музыки.";
+        const shortUz = "Video va rasmlar yuklovchi bot (YT, IG, TT, PR, FB, X).";
+        const shortRu = "Бот для скачивания видео и фото (YT, IG, TT, PR, FB, X).";
         const shortCombined = `${shortUz} | ${shortRu}`;
 
         bot.setMyShortDescription({ short_description: shortUz, language_code: 'uz' }).catch(() => { });
@@ -493,11 +493,10 @@ function startBot() {
 
     async function processUrl(chatId, url, typeContext) {
         const lang = await getLang(chatId);
-        // Immediate feedback so user knows we are working
         const statusMsg = await debugSend(chatId, getText(lang, 'processing'));
 
         try {
-            // Safety Check 1: URL Keywords (Fast)
+            // Safety Check
             const textSafety = checkText(url);
             if (!textSafety.safe) {
                 const strikeData = addStrike(chatId);
@@ -506,21 +505,29 @@ function startBot() {
                 return;
             }
 
-            // Safety Check 2: Metadata (Deep)
-            // We now use the improved getVideoInfo which is robust and provides thumbnails
+            // Fetch info to determine media type
             const info = await getVideoInfo(url).catch(() => null);
-            const title = info ? info.title : await getVideoTitle(url);
-
-            await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
-
-            if (!title) {
+            if (!info) {
+                await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
                 debugSend(chatId, getText(lang, 'error'), getBackMenu(lang));
                 return;
             }
 
-            setRequest(chatId, { url, title: title, type: 'video' });
-
+            const title = info.title || 'Media';
             const safeTitle = cleanFilename(title);
+
+            // Detection: Is it a photo?
+            // Pinterest images, X photos, etc.
+            const isPinterestImage = url.includes('pinterest.com') && (!info.video_ext || info.video_ext === 'none');
+            const isXImage = (url.includes('x.com') || url.includes('twitter.com')) && (!info.video_ext || info.video_ext === 'none') && (info.url && info.url.match(/\.(jpg|jpeg|png|webp)/i));
+
+            const isPhoto = isPinterestImage || isXImage;
+            const type = isPhoto ? 'photo' : 'video';
+
+            await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+
+            setRequest(chatId, { url, title: title, type: type });
+
             const options = {
                 outputPath: path.join(DOWNLOADS_DIR, `${safeTitle}_${Date.now()}.%(ext)s`),
                 height: 'best'
@@ -529,21 +536,24 @@ function startBot() {
             const mediaOptions = {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🎵 Audio (MP3)', callback_data: 'target_mp3' }]
+                        [{ text: '🎧 MP3', callback_data: 'target_mp3' }]
                     ]
                 }
             };
 
-            const stopAction = sendActionLoop(chatId, 'upload_video');
+            // If it's a photo, we don't need MP3 option usually, but let's keep it simple
+            if (isPhoto) mediaOptions.reply_markup.inline_keyboard = [];
+
+            const stopAction = sendActionLoop(chatId, isPhoto ? 'upload_photo' : 'upload_video');
             try {
-                await handleDownload(chatId, url, 'video', options, title, null, mediaOptions);
+                await handleDownload(chatId, url, type, options, title, null, mediaOptions);
             } finally {
                 stopAction();
             }
         } catch (error) {
-            console.error(error);
-            const lang = getLang(chatId);
-            debugSend(chatId, getText(lang, 'error'), getBackMenu(lang));
+            console.error('processUrl Error:', error);
+            const l = await getLang(chatId);
+            debugSend(chatId, getText(l, 'error'), getBackMenu(l));
         }
     }
 
@@ -906,13 +916,18 @@ function startBot() {
                 return;
             }
 
-            bot.sendChatAction(chatId, type === 'audio' ? 'upload_voice' : 'upload_video');
+            bot.sendChatAction(chatId, type === 'audio' ? 'upload_voice' : (type === 'photo' ? 'upload_photo' : 'upload_video'));
 
             if (type === 'audio') {
                 await bot.sendAudio(chatId, filePath, {
                     title: title || 'Audio',
                     performer: '@SadoMedia_bot',
                     caption: `🎧 @SadoMedia_bot`,
+                    ...mediaOptions
+                });
+            } else if (type === 'photo') {
+                await bot.sendPhoto(chatId, filePath, {
+                    caption: `${title || 'Photo'}\n\n🤖 @SadoMedia_bot`,
                     ...mediaOptions
                 });
             } else {

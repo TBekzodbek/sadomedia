@@ -180,7 +180,7 @@ async function getVideoInfo(url) {
         console.warn(`⚠️ [youtubeService] Final metadata fallback failed: ${e.message}`);
     }
 
-    throw new Error('Could not fetch video metadata.');
+    throw new Error('Could not fetch media metadata. Please check the link.');
 }
 
 async function getVideoTitle(url) {
@@ -236,6 +236,13 @@ async function downloadMedia(url, type, options = {}) {
             format: formatSelect,
             mergeOutputFormat: 'mp4',
         });
+    } else if (type === 'photo') {
+        // For photos, we often just want the best URL
+        // yt-dlp doesn't always have a 'photo' mode, so we might just use the direct URL if it's an image
+        Object.assign(flags, {
+            format: 'best',
+            // Some platforms return raw images
+        });
     }
 
     const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
@@ -267,7 +274,7 @@ async function downloadMedia(url, type, options = {}) {
             }
 
             const base = outputPath.replace('.%(ext)s', '');
-            const extensions = type === 'audio' ? ['.mp3', '.m4a'] : ['.mp4', '.mkv', '.webm'];
+            const extensions = type === 'audio' ? ['.mp3', '.m4a'] : (type === 'photo' ? ['.jpg', '.png', '.jpeg', '.webp'] : ['.mp4', '.mkv', '.webm']);
             for (const ext of extensions) {
                 const fallbackPath = base + ext;
                 if (fs.existsSync(fallbackPath)) return fallbackPath;
