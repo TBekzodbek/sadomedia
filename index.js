@@ -138,20 +138,28 @@ function startBot() {
         const descRu = "🌟 SadoMedia Bot - Ваш удобный помощник для скачивания видео и фото из соцсетей!\n\n📥 Скачивание видео и фото из YouTube, Instagram, TikTok, Pinterest, Facebook, X.\n🎵 Поиск и скачивание музыки по названию.\n\nПользоваться очень просто: просто отправьте ссылку или название музыки!";
         const descCombined = `${descUz}\n\n---\n\n${descRu}`;
 
-        bot.setMyDescription({ description: descUz, language_code: 'uz' }).catch(() => { });
-        bot.setMyDescription({ description: descRu, language_code: 'ru' }).catch(() => { });
-        bot.setMyDescription({ description: descCombined, language_code: 'en' }).catch(() => { }); // Force combined for EN
-        bot.setMyDescription({ description: descCombined }).catch(() => { });
+        const setDesc = (desc, lang) => bot.setMyDescription({ description: desc, language_code: lang })
+            .then(() => console.log(`✅ [ID: ${INSTANCE_ID}] Description set for: ${lang || 'default'}`))
+            .catch(err => console.warn(`⚠️ [ID: ${INSTANCE_ID}] Description error (${lang || 'default'}):`, err.message));
+
+        setDesc(descUz, 'uz');
+        setDesc(descRu, 'ru');
+        setDesc(descCombined, 'en'); // Explicitly override EN with combined
+        setDesc(descCombined, '');   // Default fallback
 
         // Set Short Description (Profile snippet)
         const shortUz = "Video va rasmlar yuklovchi bot (YT, IG, TT, PR, FB, X).";
         const shortRu = "Бот для скачивания видео и фото (YT, IG, TT, PR, FB, X).";
         const shortCombined = `${shortUz} | ${shortRu}`;
 
-        bot.setMyShortDescription({ short_description: shortUz, language_code: 'uz' }).catch(() => { });
-        bot.setMyShortDescription({ short_description: shortRu, language_code: 'ru' }).catch(() => { });
-        bot.setMyShortDescription({ short_description: shortCombined, language_code: 'en' }).catch(() => { }); // Force combined for EN
-        bot.setMyShortDescription({ short_description: shortCombined }).catch(() => { });
+        const setShortDesc = (desc, lang) => bot.setMyShortDescription({ short_description: desc, language_code: lang })
+            .then(() => console.log(`✅ [ID: ${INSTANCE_ID}] Short description set for: ${lang || 'default'}`))
+            .catch(err => console.warn(`⚠️ [ID: ${INSTANCE_ID}] Short desc error (${lang || 'default'}):`, err.message));
+
+        setShortDesc(shortUz, 'uz');
+        setShortDesc(shortRu, 'ru');
+        setShortDesc(shortCombined, 'en'); // Explicitly override EN with combined
+        setShortDesc(shortCombined, '');   // Default fallback
 
     }).catch(err => {
         console.error(`❌ [ID: ${INSTANCE_ID}] Bot ulanishda xatolik:`, err.message);
