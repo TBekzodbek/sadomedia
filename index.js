@@ -59,6 +59,7 @@ const STATES = {
     MAIN: 'MAIN',
     WAITING_MUSIC: 'WAITING_MUSIC',
     WAITING_VIDEO: 'WAITING_VIDEO',
+    WAITING_IMAGE: 'WAITING_IMAGE',
     WAITING_AUDIO: 'WAITING_AUDIO',
     WAITING_BROADCAST: 'WAITING_BROADCAST',
     WAITING_BROADCAST_CONFIRM: 'WAITING_BROADCAST_CONFIRM'
@@ -189,7 +190,8 @@ function startBot() {
     const getMainMenu = (lang) => {
         const keyboard = [];
         keyboard.push([{ text: getText(lang, 'menu_music') }, { text: getText(lang, 'menu_video') }]);
-        keyboard.push([{ text: getText(lang, 'menu_help') }, { text: getText(lang, 'menu_share') }]);
+        keyboard.push([{ text: getText(lang, 'menu_image') }, { text: getText(lang, 'menu_help') }]);
+        keyboard.push([{ text: getText(lang, 'menu_share') }]);
 
         return {
             reply_markup: {
@@ -324,7 +326,7 @@ function startBot() {
         }
 
         // Check if it's any of the main menu buttons to allow switching modes
-        const menuKeys = ['menu_music', 'menu_video', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
+        const menuKeys = ['menu_music', 'menu_video', 'menu_image', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
         let matchedMenu = false;
         for (const key of menuKeys) {
             if (isCommand(text, key)) {
@@ -383,6 +385,12 @@ function startBot() {
             return;
         }
 
+        if (isCommand(text, 'menu_image')) {
+            await setUserState(chatId, STATES.WAITING_IMAGE);
+            bot.sendMessage(chatId, getText(lang, 'prompt_image'), getBackMenu(lang));
+            return;
+        }
+
 
         if (isCommand(text, 'menu_help')) {
             bot.sendMessage(chatId, getText(lang, 'help_text'), getMainMenu(lang));
@@ -426,6 +434,18 @@ function startBot() {
         }
 
         // --- SMART HANDLING (MAIN STATE) ---
+        const state = await getUserState(chatId);
+
+        if (state === STATES.WAITING_VIDEO) {
+            await processUrl(chatId, text, 'video');
+            return;
+        }
+
+        if (state === STATES.WAITING_IMAGE) {
+            await processUrl(chatId, text, 'photo');
+            return;
+        }
+
         // 1. Check if URL -> Video Download
         if (text.match(/https?:\/\//)) {
             // debugSend removed here because processUrl sends its own status

@@ -4,11 +4,13 @@ const TEXTS = {
         main_menu: "Asosiy menyu",
         menu_music: "🎵 Musiqa topish",
         menu_video: "🎬 Video yuklash",
+        menu_image: "🖼️ Rasm yuklash",
         menu_help: "❓ Yordam",
         menu_back: "🏠 Bosh sahifa",
 
         prompt_music: "🔍 **Musiqa nomini yoki ijrochini yozing.**\n\nMisol: *Eminem Lose Yourself*",
-        prompt_video: "📥 **Video yoki rasm havolasini (link) yuboring:**\n(YouTube, Instagram, TikTok, Pinterest, Facebook, X)",
+        prompt_video: "📥 **Video havolasini (link) yuboring:**\n(YouTube, Instagram, TikTok, Facebook, X)",
+        prompt_image: "🖼️ **Rasm havolasini (link) yuboring:**\n(Pinterest, X, Instagram)",
         prompt_audio: "🔗 **Audio ajratib olish uchun video havolasini yuboring:**",
 
         searching: "🔎 Qidirilmoqda...",
@@ -52,11 +54,13 @@ const TEXTS = {
         main_menu: "Асосий меню",
         menu_music: "🎵 Мусиқа топиш",
         menu_video: "🎬 Видео юклаш",
+        menu_image: "🖼️ Расм юклаш",
         menu_help: "❓ Ёрдам",
         menu_back: "🏠 Бош саҳифа",
 
         prompt_music: "🔍 **Мусиқа номини ёки ижрочини ёзинг.**\n\nМисол: *Eminem Lose Yourself*",
-        prompt_video: "📥 **Видео ёки расм ҳаволасини (link) юборинг:**\n(YouTube, Instagram, TikTok, Pinterest, Facebook, X)",
+        prompt_video: "📥 **Видео ҳаволасини (link) юборинг:**\n(YouTube, Instagram, TikTok, Facebook, X)",
+        prompt_image: "🖼️ **Расм ҳаволасини (link) юборинг:**\n(Pinterest, X, Instagram)",
         prompt_audio: "🔗 **Аудио ажратиб олиш учун видео ҳаволасини юборинг:**",
 
         searching: "🔎 Қидирилмоқда...",
@@ -100,12 +104,14 @@ const TEXTS = {
         main_menu: "Главное меню",
         menu_music: "🎵 Найти музыку",
         menu_video: "🎬 Скачать видео",
+        menu_image: "🖼️ Скачать фото",
         menu_help: "❓ Помощь",
         menu_back: "🏠 Главная",
 
         prompt_music: "🔍 **Введите название песни или исполнителя.**\n\nПример: *Eminem Lose Yourself*",
-        prompt_video: "📥 **Отправьте ссылку на видео или фото:**\n(YouTube, Instagram, TikTok, Pinterest, Facebook, X)",
-        prompt_audio: "🔗 **Отправьте ссылку на видео для извлечения аудио:**",
+        prompt_video: "📥 **Отправьте ссылку на видео:**\n(YouTube, Instagram, TikTok, Facebook, X)",
+        prompt_image: "🖼️ **Отправьте ссылку на фото:**\n(Pinterest, X, Instagram)",
+        prompt_audio: "🔗 **Отправьте ссылку на video для извлечения аудио:**",
 
         searching: "🔎 Поиск...",
         downloading: "⏳ Загрузка... Пожалуйста, подождите.",
@@ -148,11 +154,13 @@ const TEXTS = {
         main_menu: "Main Menu",
         menu_music: "🎵 Find Music",
         menu_video: "🎬 Download Video",
+        menu_image: "🖼️ Download Photo",
         menu_help: "❓ Help",
         menu_back: "🏠 Home",
 
         prompt_music: "🔍 **Type the song name or artist.**\n\nExample: *Eminem Lose Yourself*",
-        prompt_video: "📥 **Send the video or photo link:**\n(YouTube, Instagram, TikTok, Pinterest, Facebook, X)",
+        prompt_video: "📥 **Send the video link:**\n(YouTube, Instagram, TikTok, Facebook, X)",
+        prompt_image: "🖼️ **Send the photo link:**\n(Pinterest, X, Instagram)",
         prompt_audio: "🔗 **Send the video link to extract audio:**",
 
         searching: "🔎 Searching...",
