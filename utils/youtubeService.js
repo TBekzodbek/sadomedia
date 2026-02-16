@@ -180,6 +180,96 @@ async function getPinterestInfo(url) {
     }
 }
 
+async function getInstagramInfo(url) {
+    try {
+        // Ensure we use the embed endpoint
+        let embedUrl = url;
+        if (!embedUrl.includes('/embed/')) {
+            embedUrl = embedUrl.split('?')[0];
+            if (!embedUrl.endsWith('/')) embedUrl += '/';
+            embedUrl += 'embed/';
+        }
+
+        console.log(`🔎 [youtubeService] Fetching Instagram Embed fallback for: ${embedUrl}`);
+        const response = await axios.get(embedUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'
+            },
+            timeout: 10000
+        });
+
+        const html = response.data;
+        let imageUrl = null;
+
+        // Try to find the highest resolution scontent link
+        // Instagram embed JSON often has multiple sizes, but broad regex is usually fine for the main photo
+        const matches = html.match(/https?:\/\/[^"'>\s]+cdninstagram\.com\/[^"'>\s]+\.(?:jpg|png|webp)/g) ||
+            html.match(/https?:\/\/[^"'>\s]+scontent[^"'>\s]+\.(?:jpg|png|webp)/g);
+
+        if (matches) {
+            // Unescape links
+            const unique = [...new Set(matches.map(u => u.replace(/\\u0026/g, '&').replace(/\\/g, '')))];
+            // Filter out icons
+            imageUrl = unique.find(u => !u.includes('/static/')) || unique[0];
+            console.log(`✅ [youtubeService] Found Instagram image via embed: ${imageUrl}`);
+        }
+
+        if (imageUrl) {
+            return {
+                title: 'Instagram Image',
+                url: imageUrl,
+                thumbnail: imageUrl,
+                ext: 'jpg',
+                video_ext: 'none',
+                vcodec: 'none',
+                acodec: 'none',
+                extractor: 'instagram:fallback'
+            };
+        }
+        return null;
+    } catch (e) {
+        console.error(`❌ [youtubeService] Instagram fallback failed: ${e.message}`);
+        return null;
+    }
+}
+
+async function getFacebookInfo(url) {
+    try {
+        console.log(`🔎 [youtubeService] Fetching Facebook HTML fallback for: ${url}`);
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+            },
+            timeout: 10000
+        });
+
+        const html = response.data;
+        // Search for og:image
+        const ogMatch = html.match(/<meta[^>]+property\s*=\s*["']og:image["'][^>]+content\s*=\s*["']([^"']+)["']/i) ||
+            html.match(/<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]+property\s*=\s*["']og:image["']/i);
+
+        if (ogMatch) {
+            const imageUrl = ogMatch[1].replace(/&amp;/g, '&');
+            console.log(`✅ [youtubeService] Found Facebook image via og:image: ${imageUrl}`);
+            return {
+                title: 'Facebook Image',
+                url: imageUrl,
+                thumbnail: imageUrl,
+                ext: 'jpg',
+                video_ext: 'none',
+                vcodec: 'none',
+                acodec: 'none',
+                extractor: 'facebook:fallback'
+            };
+        }
+        return null;
+    } catch (e) {
+        console.error(`❌ [youtubeService] Facebook fallback failed: ${e.message}`);
+        return null;
+    }
+}
+
 async function getVideoInfo(url) {
     url = cleanUrl(url);
     const cacheKey = `info:${url}`;
@@ -253,6 +343,24 @@ async function getVideoInfo(url) {
         }
     }
 
+    // INSTAGRAM FALLBACK
+    if (url.includes('instagram.com')) {
+        const instaInfo = await getInstagramInfo(url);
+        if (instaInfo) {
+            cache.set(cacheKey, instaInfo, 300);
+            return instaInfo;
+        }
+    }
+
+    // FACEBOOK FALLBACK
+    if (url.includes('facebook.com')) {
+        const fbInfo = await getFacebookInfo(url);
+        if (fbInfo) {
+            cache.set(cacheKey, fbInfo, 300);
+            return fbInfo;
+        }
+    }
+
     throw new Error('Could not fetch media metadata. Please check the link.');
 }
 
@@ -291,6 +399,8 @@ async function downloadMedia(url, type, options = {}) {
             extractAudio: true,
             audioFormat: 'mp3',
             audioQuality: '0', // Best quality
+            preferFfmpeg: true,
+            ffmpegLocation: FFMPEG_LOCATION
         });
         console.log(`🎵 [youtubeService] Audio download flags:`, flags);
     } else if (type === 'video') {
@@ -342,11 +452,31 @@ async function downloadMedia(url, type, options = {}) {
         }
 
         // Platform Fallback: yt-dlp usually fails here without cookies
-        if (url.includes('facebook.com') || url.includes('instagram.com')) {
+        if (url.includes('facebook.com') || url.includes('instagram.com') || url.includes('pinterest.com')) {
             const info = cache.get(`info:${url}`);
-            // If yt-dlp didn't find a direct URL or format, and it's recognized as a photo
-            if (!info || !info.url || info.url.includes('facebook.com/photo') || info.url.includes('instagram.com/p/')) {
-                throw new Error('RESTRICTED_PLATFORM_IMAGE');
+            if (info && info.extractor && info.extractor.endsWith(':fallback')) {
+                try {
+                    console.log(`📡 [youtubeService] Downloading ${info.extractor} image directly: ${info.url}`);
+                    const response = await axios({
+                        url: info.url,
+                        method: 'GET',
+                        responseType: 'stream'
+                    });
+
+                    const ext = info.ext || 'jpg';
+                    const actualPath = outputPath.replace('.%(ext)s', `.${ext}`);
+                    const writer = fs.createWriteStream(actualPath);
+
+                    response.data.pipe(writer);
+
+                    return new Promise((resolve, reject) => {
+                        writer.on('finish', () => resolve(actualPath));
+                        writer.on('error', reject);
+                    });
+                } catch (e) {
+                    console.warn(`⚠️ [youtubeService] Direct fallback download failed: ${e.message}`);
+                    // Fallthrough to yt-dlp if direct fails
+                }
             }
         }
 
