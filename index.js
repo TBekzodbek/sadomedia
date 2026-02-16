@@ -142,8 +142,8 @@ function startBot() {
         ]).catch(err => console.error('Error setting commands:', err.message));
 
         // Set Bot Description (Long text in "What can this bot do?")
-        const descUz = "🚀 **SadoMedia Bot — Ijtimoiy tarmoqlardan media yuklash:**\n\n• 📹 YouTube, Instagram, TikTok\n• 🖼️ Pinterest, Facebook, X (Twitter)\n• 🎵 Musiqa qidirish va yuklab olish\n\n✨ **Xususiyatlari:** Yuqori sifat va tezkor yuklash!";
-        const descRu = "🚀 **SadoMedia Bot — Скачивание медиа из соцсетей:**\n\n• 📹 YouTube, Instagram, TikTok\n• 🖼️ Pinterest, Facebook, X (Twitter)\n• 🎵 Поиск и скачивание музыки\n\n✨ **Особенности:** Высокое качество и быстрая загрузка!";
+        const descUz = "🚀 **SadoMedia Bot — Ijtimoiy tarmoqlardan video yuklash:**\n\n• 📹 YouTube, Instagram, TikTok\n• 🎵 Musiqa qidirish va yuklab olish\n\n✨ **Xususiyatlari:** Yuqori sifat va tezkor yuklash!";
+        const descRu = "🚀 **SadoMedia Bot — Скачивание видео из соцсетей:**\n\n• 📹 YouTube, Instagram, TikTok\n• 🎵 Поиск и скачивание музыки\n\n✨ **Особенности:** Высокое качество и быстрая загрузка!";
         const descCombined = `${descUz}\n\n---\n\n${descRu}`;
 
         const setDesc = (desc, lang) => bot.setMyDescription({ description: desc, language_code: lang })
