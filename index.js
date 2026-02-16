@@ -156,18 +156,16 @@ function startBot() {
         setDesc(descCombined, '');
 
         // Set Short Description (Profile snippet)
-        const shortUz = "Video va rasmlar yuklovchi bot (YT, IG, TT, PR, FB, X).";
-        const shortRu = "Бот для скачивания видео и фото (YT, IG, TT, PR, FB, X).";
-        const shortCombined = `${shortUz} | ${shortRu}`;
+        const contactText = "Murojaat uchun @zeranova_music";
 
         const setShortDesc = (desc, lang) => bot.setMyShortDescription({ short_description: desc, language_code: lang })
             .then(() => console.log(`✅ [ID: ${INSTANCE_ID}] Short description set for: ${lang || 'default'}`))
             .catch(err => console.warn(`⚠️ [ID: ${INSTANCE_ID}] Short desc error (${lang || 'default'}):`, err.message));
 
-        setShortDesc(shortUz, 'uz');
-        setShortDesc(shortRu, 'ru');
-        setShortDesc(shortCombined, 'en'); // Explicitly override EN with combined
-        setShortDesc(shortCombined, '');   // Default fallback
+        setShortDesc(contactText, 'uz');
+        setShortDesc(contactText, 'ru');
+        setShortDesc(contactText, 'en');
+        setShortDesc(contactText, '');
 
     }).catch(err => {
         console.error(`❌ [ID: ${INSTANCE_ID}] Bot ulanishda xatolik:`, err.message);
