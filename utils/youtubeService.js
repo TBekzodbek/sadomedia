@@ -117,68 +117,6 @@ async function searchMusic(query, limit = 50) {
     }
 }
 
-async function getPinterestInfo(url) {
-    try {
-        console.log(`🔎 [youtubeService] Fetching Pinterest HTML fallback for: ${url}`);
-        const response = await axios.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'
-            },
-            timeout: 10000
-        });
-
-        const html = response.data;
-        let imageUrl = null;
-
-        // 1. Try a more flexible og:image meta tag match (handles any attribute order)
-        const ogMatch = html.match(/<meta[^>]+(?:property|name)\s*=\s*["']og:image["'][^>]+content\s*=\s*["']([^"']+)["']/i) ||
-            html.match(/<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]+(?:property|name)\s*=\s*["']og:image["']/i);
-
-        if (ogMatch) {
-            imageUrl = ogMatch[1];
-            console.log(`✅ [youtubeService] Found Pinterest image via og:image: ${imageUrl}`);
-        } else {
-            // 2. Fallback to broad search but filter out logos/icons
-            const matches = html.match(/https:\/\/i\.pinimg\.com\/(?:originals|736x)\/[a-zA-Z0-9\/\._-]+\.(?:jpg|png|webp)/g);
-            if (matches) {
-                const unique = [...new Set(matches)];
-                // Filter out common UI element keywords
-                const filtered = unique.filter(u => !u.toLowerCase().match(/logo|icon|avatar|header|footer|button/));
-                if (filtered.length > 0) {
-                    imageUrl = filtered[0];
-                    console.log(`⚠️ [youtubeService] Found Pinterest image via broad fallback: ${imageUrl}`);
-                }
-            }
-        }
-
-        if (imageUrl) {
-            // Optional: try to upgrade 736x to originals if applicable
-            if (imageUrl.includes('/736x/')) {
-                const originalUrl = imageUrl.replace('/736x/', '/originals/');
-                // We'll use the original but keep 736x as fallback if we wanted to be super safe, 
-                // but usually originals exists if 736x does.
-                imageUrl = originalUrl;
-            }
-
-            return {
-                title: 'Pinterest Image',
-                url: imageUrl,
-                thumbnail: imageUrl,
-                ext: imageUrl.split('.').pop().split('?')[0], // clean extension
-                video_ext: 'none',
-                vcodec: 'none',
-                acodec: 'none',
-                extractor: 'pinterest:fallback'
-            };
-        }
-
-        return null;
-    } catch (e) {
-        console.error(`❌ [youtubeService] Pinterest fallback failed: ${e.message}`);
-        return null;
-    }
-}
 
 
 async function getVideoInfo(url) {
@@ -245,14 +183,6 @@ async function getVideoInfo(url) {
         console.warn(`⚠️ [youtubeService] Final metadata fallback failed: ${e.message}`);
     }
 
-    // PINTEREST FALLBACK
-    if (url.includes('pinterest.com')) {
-        const pinInfo = await getPinterestInfo(url);
-        if (pinInfo) {
-            cache.set(cacheKey, pinInfo, 300);
-            return pinInfo;
-        }
-    }
 
 
     throw new Error('Could not fetch media metadata. Please check the link.');
@@ -316,66 +246,6 @@ async function downloadMedia(url, type, options = {}) {
             format: formatSelect,
             mergeOutputFormat: 'mp4',
         });
-    } else if (type === 'photo') {
-        const info = cache.get(`info:${url}`);
-        if (info && info.extractor && info.extractor.startsWith('pinterest:fallback')) {
-            try {
-                console.log(`📡 [youtubeService] Downloading image directly: ${info.url}`);
-                const response = await axios({
-                    url: info.url,
-                    method: 'GET',
-                    responseType: 'stream'
-                });
-
-                const ext = info.ext || 'jpg';
-                const actualPath = outputPath.replace('.%(ext)s', `.${ext}`);
-                const writer = fs.createWriteStream(actualPath);
-
-                response.data.pipe(writer);
-
-                return new Promise((resolve, reject) => {
-                    writer.on('finish', () => resolve(actualPath));
-                    writer.on('error', reject);
-                });
-            } catch (e) {
-                console.warn(`⚠️ [youtubeService] Direct Pinterest download failed: ${e.message}`);
-                // Fallthrough to yt-dlp if direct fails
-            }
-        }
-
-        // Platform Fallback: yt-dlp usually fails here without cookies
-        if (url.includes('pinterest.com')) {
-            const info = cache.get(`info:${url}`);
-            if (info && info.extractor && info.extractor.endsWith(':fallback')) {
-                try {
-                    console.log(`📡 [youtubeService] Downloading ${info.extractor} image directly: ${info.url}`);
-                    const response = await axios({
-                        url: info.url,
-                        method: 'GET',
-                        responseType: 'stream'
-                    });
-
-                    const ext = info.ext || 'jpg';
-                    const actualPath = outputPath.replace('.%(ext)s', `.${ext}`);
-                    const writer = fs.createWriteStream(actualPath);
-
-                    response.data.pipe(writer);
-
-                    return new Promise((resolve, reject) => {
-                        writer.on('finish', () => resolve(actualPath));
-                        writer.on('error', reject);
-                    });
-                } catch (e) {
-                    console.warn(`⚠️ [youtubeService] Direct fallback download failed: ${e.message}`);
-                    // Fallthrough to yt-dlp if direct fails
-                }
-            }
-        }
-
-        Object.assign(flags, {
-            format: 'best',
-            // Some platforms return raw images
-        });
     }
 
     console.log(`🚀 [youtubeService] Final ${type} download flags:`, flags);
@@ -408,7 +278,7 @@ async function downloadMedia(url, type, options = {}) {
             }
 
             const base = outputPath.replace('.%(ext)s', '');
-            const extensions = type === 'audio' ? ['.mp3', '.m4a'] : (type === 'photo' ? ['.jpg', '.png', '.jpeg', '.webp'] : ['.mp4', '.mkv', '.webm']);
+            const extensions = type === 'audio' ? ['.mp3', '.m4a'] : ['.mp4', '.mkv', '.webm'];
             for (const ext of extensions) {
                 const fallbackPath = base + ext;
                 if (fs.existsSync(fallbackPath)) return fallbackPath;

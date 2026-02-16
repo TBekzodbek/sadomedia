@@ -59,7 +59,6 @@ const STATES = {
     MAIN: 'MAIN',
     WAITING_MUSIC: 'WAITING_MUSIC',
     WAITING_VIDEO: 'WAITING_VIDEO',
-    WAITING_IMAGE: 'WAITING_IMAGE',
     WAITING_AUDIO: 'WAITING_AUDIO',
     WAITING_BROADCAST: 'WAITING_BROADCAST',
     WAITING_BROADCAST_CONFIRM: 'WAITING_BROADCAST_CONFIRM'
@@ -209,8 +208,7 @@ function startBot() {
     const getMainMenu = (lang) => {
         const keyboard = [];
         keyboard.push([{ text: getText(lang, 'menu_music') }, { text: getText(lang, 'menu_video') }]);
-        keyboard.push([{ text: getText(lang, 'menu_image') }, { text: getText(lang, 'menu_help') }]);
-        keyboard.push([{ text: getText(lang, 'menu_share') }]);
+        keyboard.push([{ text: getText(lang, 'menu_help') }, { text: getText(lang, 'menu_share') }]);
 
         return {
             reply_markup: {
@@ -346,7 +344,7 @@ function startBot() {
             }
 
             // Check if it's any of the main menu buttons to allow switching modes
-            const menuKeys = ['menu_music', 'menu_video', 'menu_image', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
+            const menuKeys = ['menu_music', 'menu_video', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
             let matchedMenu = false;
             for (const key of menuKeys) {
                 if (isCommand(text, key)) {
@@ -405,11 +403,6 @@ function startBot() {
                 return;
             }
 
-            if (isCommand(text, 'menu_image')) {
-                await setUserState(chatId, STATES.WAITING_IMAGE);
-                bot.sendMessage(chatId, getText(lang, 'prompt_image'), getBackMenu(lang));
-                return;
-            }
 
 
             if (isCommand(text, 'menu_help')) {
@@ -461,10 +454,6 @@ function startBot() {
                 return;
             }
 
-            if (state === STATES.WAITING_IMAGE) {
-                await processUrl(chatId, text, 'photo');
-                return;
-            }
 
             // 1. Check if URL -> Video Download
             if (text.match(/https?:\/\//)) {
@@ -569,15 +558,7 @@ function startBot() {
             const title = info.title || 'Media';
             const safeTitle = cleanFilename(title);
 
-            // Detection: Is it a photo?
-            // Pinterest images, X photos, Facebook photos, Instagram photos etc.
-            const isPinterestImage = url.includes('pinterest.com') && (!info.video_ext || info.video_ext === 'none');
-            const isXImage = (url.includes('x.com') || url.includes('twitter.com')) && (!info.video_ext || info.video_ext === 'none') && (info.url && info.url.match(/\.(jpg|jpeg|png|webp)/i));
-            const isFBImage = url.includes('facebook.com') && url.includes('/photo') && (!info.video_ext || info.video_ext === 'none');
-            const isInstagramImage = url.includes('instagram.com') && (url.includes('/p/') || url.includes('/reels/')) && (!info.video_ext || info.video_ext === 'none');
-
-            const isPhoto = isPinterestImage || isXImage || isFBImage || isInstagramImage;
-            const type = isPhoto ? 'photo' : 'video';
+            const type = 'video';
 
             await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
 
@@ -596,10 +577,7 @@ function startBot() {
                 }
             };
 
-            // If it's a photo, we don't need MP3 option usually, but let's keep it simple
-            if (isPhoto) mediaOptions.reply_markup.inline_keyboard = [];
-
-            const stopAction = sendActionLoop(chatId, isPhoto ? 'upload_photo' : 'upload_video');
+            const stopAction = sendActionLoop(chatId, 'upload_video');
             try {
                 await handleDownload(chatId, url, type, options, title, null, mediaOptions);
             } finally {
@@ -980,18 +958,13 @@ function startBot() {
                 return;
             }
 
-            bot.sendChatAction(chatId, type === 'audio' ? 'upload_voice' : (type === 'photo' ? 'upload_photo' : 'upload_video'));
+            bot.sendChatAction(chatId, type === 'audio' ? 'upload_voice' : 'upload_video');
 
             if (type === 'audio') {
                 await bot.sendAudio(chatId, filePath, {
                     title: title || 'Audio',
                     performer: '@SadoMedia_bot',
                     caption: `🎧 @SadoMedia_bot`,
-                    ...mediaOptions
-                });
-            } else if (type === 'photo') {
-                await bot.sendPhoto(chatId, filePath, {
-                    caption: `${title || 'Photo'}\n\n🤖 @SadoMedia_bot`,
                     ...mediaOptions
                 });
             } else {
@@ -1010,9 +983,6 @@ function startBot() {
 
         } catch (error) {
             console.error('Download Error:', error);
-            if (error.message === 'RESTRICTED_PLATFORM_IMAGE') {
-                return debugSend(chatId, getText(lang, 'restricted_content'), getBackMenu(lang));
-            }
             let errMsg = error.message;
             if (errMsg.includes('Requested format is not available')) errMsg = "Tanlangan format mavjud emas. Iltimos, boshqa sifatni sinab ko'ring.";
             else if (errMsg.includes('Video unavailable')) errMsg = "Video topilmadi yoki o'chirib tashlangan.";
