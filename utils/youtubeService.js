@@ -2,6 +2,7 @@ const youtubedl = require('youtube-dl-exec');
 const path = require('path');
 const NodeCache = require('node-cache');
 const fs = require('fs-extra');
+const axios = require('axios');
 
 // Initialize Cache (TTL: 1 hour for search/info, 10 mins for titles)
 const cache = new NodeCache({ stdTTL: 3600 });
@@ -116,6 +117,64 @@ async function searchMusic(query, limit = 50) {
     }
 }
 
+async function getPinterestInfo(url) {
+    try {
+        console.log(`🔎 [youtubeService] Fetching Pinterest HTML fallback for: ${url}`);
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'
+            },
+            timeout: 10000
+        });
+
+        const html = response.data;
+
+        // Try to find originals first
+        let imageMatches = html.match(/https:\/\/i\.pinimg\.com\/originals\/[a-zA-Z0-9\/\._-]+\.(jpg|pdf|png|webp)/g);
+
+        // If no originals, try 736x
+        if (!imageMatches || imageMatches.length === 0) {
+            imageMatches = html.match(/https:\/\/i\.pinimg\.com\/736x\/[a-zA-Z0-9\/\._-]+\.(jpg|pdf|png|webp)/g);
+        }
+
+        if (imageMatches && imageMatches.length > 0) {
+            const uniqueImages = [...new Set(imageMatches)];
+            // Usually the first one is the main image
+            const imageUrl = uniqueImages[0];
+
+            return {
+                title: 'Pinterest Image',
+                url: imageUrl,
+                thumbnail: imageUrl,
+                ext: imageUrl.split('.').pop(),
+                video_ext: 'none',
+                vcodec: 'none',
+                acodec: 'none',
+                extractor: 'pinterest:fallback'
+            };
+        }
+
+        // Try og:image as last resort
+        const ogImageMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i);
+        if (ogImageMatch) {
+            return {
+                title: 'Pinterest Image',
+                url: ogImageMatch[1],
+                thumbnail: ogImageMatch[1],
+                ext: ogImageMatch[1].split('.').pop(),
+                video_ext: 'none',
+                extractor: 'pinterest:fallback:og'
+            };
+        }
+
+        return null;
+    } catch (e) {
+        console.error(`❌ [youtubeService] Pinterest fallback failed: ${e.message}`);
+        return null;
+    }
+}
+
 async function getVideoInfo(url) {
     url = cleanUrl(url);
     const cacheKey = `info:${url}`;
@@ -180,6 +239,15 @@ async function getVideoInfo(url) {
         console.warn(`⚠️ [youtubeService] Final metadata fallback failed: ${e.message}`);
     }
 
+    // PINTEREST FALLBACK
+    if (url.includes('pinterest.com')) {
+        const pinInfo = await getPinterestInfo(url);
+        if (pinInfo) {
+            cache.set(cacheKey, pinInfo, 300);
+            return pinInfo;
+        }
+    }
+
     throw new Error('Could not fetch media metadata. Please check the link.');
 }
 
@@ -238,8 +306,34 @@ async function downloadMedia(url, type, options = {}) {
             mergeOutputFormat: 'mp4',
         });
     } else if (type === 'photo') {
-        // For photos, we often just want the best URL
-        // yt-dlp doesn't always have a 'photo' mode, so we might just use the direct URL if it's an image
+        // If we have a direct photo URL from our Pinterest fallback, download it directly
+        // We'll check if the info (which is usually fetched before this) exists in cache
+        const info = cache.get(`info:${url}`);
+        if (info && info.extractor && info.extractor.startsWith('pinterest:fallback')) {
+            try {
+                console.log(`📡 [youtubeService] Downloading Pinterest image directly: ${info.url}`);
+                const response = await axios({
+                    url: info.url,
+                    method: 'GET',
+                    responseType: 'stream'
+                });
+
+                const ext = info.ext || 'jpg';
+                const actualPath = outputPath.replace('.%(ext)s', `.${ext}`);
+                const writer = fs.createWriteStream(actualPath);
+
+                response.data.pipe(writer);
+
+                return new Promise((resolve, reject) => {
+                    writer.on('finish', () => resolve(actualPath));
+                    writer.on('error', reject);
+                });
+            } catch (e) {
+                console.warn(`⚠️ [youtubeService] Direct Pinterest download failed: ${e.message}`);
+                // Fallthrough to yt-dlp if direct fails
+            }
+        }
+
         Object.assign(flags, {
             format: 'best',
             // Some platforms return raw images
