@@ -25,7 +25,7 @@ const COOKIES_PATH = path.join(__dirname, '../cookies.txt');
 console.log(`📡 [youtubeService] Using binary: ${YOUTUBE_DL_BINARY}`);
 
 // Helper for youtubedl options to avoid repetition
-function getBaseOptions() {
+function getYtDlpOptions() {
     const env = { ...process.env };
     // On Windows, the environment variable is 'Path' (case-sensitive in Node.js env object)
     const pathKey = isWin ? 'Path' : 'PATH';
@@ -86,7 +86,7 @@ async function searchVideo(query, limit = 5) {
             ffmpegLocation: FFMPEG_LOCATION
         };
 
-        const output = await youtubedl(`ytsearch${limit}:${query}`, flags, getBaseOptions());
+        const output = await youtubedl(`ytsearch${limit}:${query}`, flags, getYtDlpOptions());
         cache.set(cacheKey, output);
         return output;
     } catch (e) {
@@ -109,7 +109,7 @@ async function searchMusic(query, limit = 50) {
             ffmpegLocation: FFMPEG_LOCATION
         };
 
-        const output = await youtubedl(`ytsearch${limit}:${query}`, flags, getBaseOptions());
+        const output = await youtubedl(`ytsearch${limit}:${query}`, flags, getYtDlpOptions());
         cache.set(cacheKey, output);
         return output;
     } catch (e) {
@@ -129,42 +129,47 @@ async function getPinterestInfo(url) {
         });
 
         const html = response.data;
+        let imageUrl = null;
 
-        // Try to find originals first
-        let imageMatches = html.match(/https:\/\/i\.pinimg\.com\/originals\/[a-zA-Z0-9\/\._-]+\.(jpg|pdf|png|webp)/g);
+        // 1. Try a more flexible og:image meta tag match (handles any attribute order)
+        const ogMatch = html.match(/<meta[^>]+(?:property|name)\s*=\s*["']og:image["'][^>]+content\s*=\s*["']([^"']+)["']/i) ||
+            html.match(/<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]+(?:property|name)\s*=\s*["']og:image["']/i);
 
-        // If no originals, try 736x
-        if (!imageMatches || imageMatches.length === 0) {
-            imageMatches = html.match(/https:\/\/i\.pinimg\.com\/736x\/[a-zA-Z0-9\/\._-]+\.(jpg|pdf|png|webp)/g);
+        if (ogMatch) {
+            imageUrl = ogMatch[1];
+            console.log(`✅ [youtubeService] Found Pinterest image via og:image: ${imageUrl}`);
+        } else {
+            // 2. Fallback to broad search but filter out logos/icons
+            const matches = html.match(/https:\/\/i\.pinimg\.com\/(?:originals|736x)\/[a-zA-Z0-9\/\._-]+\.(?:jpg|png|webp)/g);
+            if (matches) {
+                const unique = [...new Set(matches)];
+                // Filter out common UI element keywords
+                const filtered = unique.filter(u => !u.toLowerCase().match(/logo|icon|avatar|header|footer|button/));
+                if (filtered.length > 0) {
+                    imageUrl = filtered[0];
+                    console.log(`⚠️ [youtubeService] Found Pinterest image via broad fallback: ${imageUrl}`);
+                }
+            }
         }
 
-        if (imageMatches && imageMatches.length > 0) {
-            const uniqueImages = [...new Set(imageMatches)];
-            // Usually the first one is the main image
-            const imageUrl = uniqueImages[0];
+        if (imageUrl) {
+            // Optional: try to upgrade 736x to originals if applicable
+            if (imageUrl.includes('/736x/')) {
+                const originalUrl = imageUrl.replace('/736x/', '/originals/');
+                // We'll use the original but keep 736x as fallback if we wanted to be super safe, 
+                // but usually originals exists if 736x does.
+                imageUrl = originalUrl;
+            }
 
             return {
                 title: 'Pinterest Image',
                 url: imageUrl,
                 thumbnail: imageUrl,
-                ext: imageUrl.split('.').pop(),
+                ext: imageUrl.split('.').pop().split('?')[0], // clean extension
                 video_ext: 'none',
                 vcodec: 'none',
                 acodec: 'none',
                 extractor: 'pinterest:fallback'
-            };
-        }
-
-        // Try og:image as last resort
-        const ogImageMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i);
-        if (ogImageMatch) {
-            return {
-                title: 'Pinterest Image',
-                url: ogImageMatch[1],
-                thumbnail: ogImageMatch[1],
-                ext: ogImageMatch[1].split('.').pop(),
-                video_ext: 'none',
-                extractor: 'pinterest:fallback:og'
             };
         }
 
@@ -202,7 +207,7 @@ async function getVideoInfo(url) {
                 flags.extractorArgs = `youtube:player_client=${client}`;
             }
 
-            const info = await youtubedl(url, flags, getBaseOptions());
+            const info = await youtubedl(url, flags, getYtDlpOptions());
 
             if (info && !info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
                 info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
@@ -227,7 +232,7 @@ async function getVideoInfo(url) {
             cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
             ffmpegLocation: FFMPEG_LOCATION
         };
-        const info = await youtubedl(url, flags, getBaseOptions());
+        const info = await youtubedl(url, flags, getYtDlpOptions());
         if (info) {
             if (!info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
                 info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
@@ -351,8 +356,7 @@ async function downloadMedia(url, type, options = {}) {
                 currentFlags.extractorArgs = `youtube:player_client=${client}`;
             }
 
-            // Using longer timeout for actual downloads
-            const downloadOpts = getBaseOptions();
+            const downloadOpts = getYtDlpOptions();
             downloadOpts.timeout = 300000; // 5 minutes for download
 
             const result = await youtubedl(url, currentFlags, downloadOpts);
@@ -382,8 +386,7 @@ async function downloadMedia(url, type, options = {}) {
 
     // FINAL FALLBACK: Simplest download
     try {
-        console.log('🔄 [youtubeService] All clients failed or path error. Trying final fallback...');
-        const fallbackOpts = getBaseOptions();
+        const fallbackOpts = getYtDlpOptions();
         fallbackOpts.timeout = 300000;
 
         await youtubedl(url, { ...flags, format: 'best' }, fallbackOpts);
