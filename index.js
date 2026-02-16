@@ -570,12 +570,13 @@ function startBot() {
             const safeTitle = cleanFilename(title);
 
             // Detection: Is it a photo?
-            // Pinterest images, X photos, Facebook photos etc.
+            // Pinterest images, X photos, Facebook photos, Instagram photos etc.
             const isPinterestImage = url.includes('pinterest.com') && (!info.video_ext || info.video_ext === 'none');
             const isXImage = (url.includes('x.com') || url.includes('twitter.com')) && (!info.video_ext || info.video_ext === 'none') && (info.url && info.url.match(/\.(jpg|jpeg|png|webp)/i));
             const isFBImage = url.includes('facebook.com') && url.includes('/photo') && (!info.video_ext || info.video_ext === 'none');
+            const isInstagramImage = url.includes('instagram.com') && (url.includes('/p/') || url.includes('/reels/')) && (!info.video_ext || info.video_ext === 'none');
 
-            const isPhoto = isPinterestImage || isXImage || isFBImage;
+            const isPhoto = isPinterestImage || isXImage || isFBImage || isInstagramImage;
             const type = isPhoto ? 'photo' : 'video';
 
             await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });

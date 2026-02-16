@@ -341,11 +341,11 @@ async function downloadMedia(url, type, options = {}) {
             }
         }
 
-        // Facebook Photo Fallback: yt-dlp usually fails here without cookies
-        if (url.includes('facebook.com')) {
+        // Platform Fallback: yt-dlp usually fails here without cookies
+        if (url.includes('facebook.com') || url.includes('instagram.com')) {
             const info = cache.get(`info:${url}`);
             // If yt-dlp didn't find a direct URL or format, and it's recognized as a photo
-            if (!info || !info.url || info.url.includes('facebook.com/photo')) {
+            if (!info || !info.url || info.url.includes('facebook.com/photo') || info.url.includes('instagram.com/p/')) {
                 throw new Error('RESTRICTED_PLATFORM_IMAGE');
             }
         }
