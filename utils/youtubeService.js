@@ -438,12 +438,10 @@ async function downloadMedia(url, type, options = {}) {
             mergeOutputFormat: 'mp4',
         });
     } else if (type === 'photo') {
-        // If we have a direct photo URL from our Pinterest fallback, download it directly
-        // We'll check if the info (which is usually fetched before this) exists in cache
         const info = cache.get(`info:${url}`);
-        if (info && info.extractor && info.extractor.startsWith('pinterest:fallback')) {
+        if (info && info.extractor && (info.extractor.startsWith('pinterest:fallback') || info.extractor.startsWith('instagram:fallback') || info.extractor.startsWith('facebook:fallback'))) {
             try {
-                console.log(`📡 [youtubeService] Downloading Pinterest image directly: ${info.url}`);
+                console.log(`📡 [youtubeService] Downloading image directly: ${info.url}`);
                 const response = await axios({
                     url: info.url,
                     method: 'GET',
