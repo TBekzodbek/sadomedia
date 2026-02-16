@@ -140,6 +140,7 @@ function startBot() {
 
         bot.setMyDescription({ description: descUz, language_code: 'uz' }).catch(() => { });
         bot.setMyDescription({ description: descRu, language_code: 'ru' }).catch(() => { });
+        bot.setMyDescription({ description: descCombined, language_code: 'en' }).catch(() => { }); // Force combined for EN
         bot.setMyDescription({ description: descCombined }).catch(() => { });
 
         // Set Short Description (Profile snippet)
@@ -149,6 +150,7 @@ function startBot() {
 
         bot.setMyShortDescription({ short_description: shortUz, language_code: 'uz' }).catch(() => { });
         bot.setMyShortDescription({ short_description: shortRu, language_code: 'ru' }).catch(() => { });
+        bot.setMyShortDescription({ short_description: shortCombined, language_code: 'en' }).catch(() => { }); // Force combined for EN
         bot.setMyShortDescription({ short_description: shortCombined }).catch(() => { });
 
     }).catch(err => {
