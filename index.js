@@ -125,6 +125,28 @@ function startBot() {
         botUsername = me.username;
         console.log(`✅ [ID: ${INSTANCE_ID}] Bot muvaffaqiyatli ulandi! Username: @${botUsername}`);
         console.log(`📡 [ID: ${INSTANCE_ID}] Polling boshlandi...`);
+
+        // Set Bot Commands
+        bot.setMyCommands([
+            { command: 'start', description: 'Botni ishga tushirish / Start the bot' },
+            { command: 'help', description: 'Yordam / Help' },
+            { command: 'admin', description: 'Admin panel (Adminlar uchun)' }
+        ]).catch(err => console.error('Error setting commands:', err.message));
+
+        // Set Bot Description (Long text in "What can this bot do?")
+        const descUz = "🌟 SadoMedia Bot - Ijtimoiy tarmoqlardan video va musiqalar yuklash uchun eng qulay yordamchingiz!\n\n📥 YouTube, Instagram, TikTok dan video yuklash.\n🎵 Musiqalarni nomi bo'yicha topish va yuklab olish.\n\nFoydalanish juda oson: shunchaki havola yuboring yoki musiqa nomini yozing!";
+        const descRu = "🌟 SadoMedia Bot - Ваш удобный помощник для скачивания видео и музыки из соцсетей!\n\n📥 Скачивание видео из YouTube, Instagram, TikTok.\n🎵 Поиск и скачивание музыки по названию.\n\nПользоваться очень просто: просто отправьте ссылку или название музыки!";
+        const descEn = "🌟 SadoMedia Bot - Your handy assistant for downloading videos and music from social media!\n\n📥 Download videos from YouTube, Instagram, TikTok.\n🎵 Search and download music by name.\n\nEasy to use: just send a link or type a song name!";
+
+        bot.setMyDescription({ description: descUz, language_code: 'uz' }).catch(() => { });
+        bot.setMyDescription({ description: descRu, language_code: 'ru' }).catch(() => { });
+        bot.setMyDescription({ description: descEn }).catch(() => { });
+
+        // Set Short Description (Profile snippet)
+        bot.setMyShortDescription({ short_description: "Video va musiqalar yuklovchi bot.", language_code: 'uz' }).catch(() => { });
+        bot.setMyShortDescription({ short_description: "Бот для скачивания видео и музыки.", language_code: 'ru' }).catch(() => { });
+        bot.setMyShortDescription({ short_description: "Download videos and music easily." }).catch(() => { });
+
     }).catch(err => {
         console.error(`❌ [ID: ${INSTANCE_ID}] Bot ulanishda xatolik:`, err.message);
     });
