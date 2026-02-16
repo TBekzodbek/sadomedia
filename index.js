@@ -134,18 +134,18 @@ function startBot() {
         ]).catch(err => console.error('Error setting commands:', err.message));
 
         // Set Bot Description (Long text in "What can this bot do?")
-        const descUz = "🌟 SadoMedia Bot - Ijtimoiy tarmoqlardan video va rasmlar yuklash uchun eng qulay yordamchingiz!\n\n📥 YouTube, Instagram, TikTok, Pinterest, Facebook, X dan video va rasmlar yuklash.\n🎵 Musiqalarni nomi bo'yicha topish va yuklab olish.\n\nFoydalanish juda oson: shunchaki havola yuboring yoki musiqa nomini yozing!";
-        const descRu = "🌟 SadoMedia Bot - Ваш удобный помощник для скачивания видео и фото из соцсетей!\n\n📥 Скачивание видео и фото из YouTube, Instagram, TikTok, Pinterest, Facebook, X.\n🎵 Поиск и скачивание музыки по названию.\n\nПользоваться очень просто: просто отправьте ссылку или название музыки!";
+        const descUz = "🚀 **SadoMedia Bot — Ijtimoiy tarmoqlardan media yuklash:**\n\n• 📹 YouTube, Instagram, TikTok\n• 🖼️ Pinterest, Facebook, X (Twitter)\n• 🎵 Musiqa qidirish va yuklab olish\n\n✨ **Xususiyatlari:** Suv belgisiz, yuqori sifat va tezkor yuklash!";
+        const descRu = "🚀 **SadoMedia Bot — Скачивание медиа из соцсетей:**\n\n• 📹 YouTube, Instagram, TikTok\n• 🖼️ Pinterest, Facebook, X (Twitter)\n• 🎵 Поиск и скачивание музыки\n\n✨ **Особенности:** Без водяных знаков, высокое качество и быстрая загрузка!";
         const descCombined = `${descUz}\n\n---\n\n${descRu}`;
 
         const setDesc = (desc, lang) => bot.setMyDescription({ description: desc, language_code: lang })
             .then(() => console.log(`✅ [ID: ${INSTANCE_ID}] Description set for: ${lang || 'default'}`))
             .catch(err => console.warn(`⚠️ [ID: ${INSTANCE_ID}] Description error (${lang || 'default'}):`, err.message));
 
-        setDesc(descUz, 'uz');
-        setDesc(descRu, 'ru');
-        setDesc(descCombined, 'en'); // Explicitly override EN with combined
-        setDesc(descCombined, '');   // Default fallback
+        setDesc(descCombined, 'uz');
+        setDesc(descCombined, 'ru');
+        setDesc(descCombined, 'en');
+        setDesc(descCombined, '');
 
         // Set Short Description (Profile snippet)
         const shortUz = "Video va rasmlar yuklovchi bot (YT, IG, TT, PR, FB, X).";
