@@ -247,7 +247,6 @@ async function downloadMedia(url, type, options = {}) {
             extractAudio: true,
             audioFormat: 'mp3',
             audioQuality: '0', // Best quality
-            preferFfmpeg: true,
             ffmpegLocation: FFMPEG_LOCATION
         });
         console.log(`🎵 [youtubeService] Audio download flags:`, flags);
@@ -256,12 +255,13 @@ async function downloadMedia(url, type, options = {}) {
         let formatSelect;
 
         if (isYouTube) {
-            // Priority: MP4 up to target height > Best video+audio up to target height > Best overall
+            // Priority: MP4 up to target height > Best video+audio up to target height > Any best available
+            // Using bv/ba for shorter strings, ensuring we always have a final 'best' fallback
             formatSelect = isNumericHeight
-                ? `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${height}][ext=mp4]/bestvideo[height<=${height}]+bestaudio/best[height<=${height}]/best`
-                : 'bestvideo[height<=?720][ext=mp4]+bestaudio[ext=m4a]/best[height<=?720][ext=mp4]/bestvideo[height<=?720]+bestaudio/best';
+                ? `bv[height<=${height}][ext=mp4]+ba[ext=m4a]/b[height<=${height}][ext=mp4]/bv[height<=${height}]+ba/b[height<=${height}]/best`
+                : 'bv[height<=?720][ext=mp4]+ba[ext=m4a]/b[height<=?720][ext=mp4]/bv[height<=?720]+ba/b[height<=?720]/best';
         } else {
-            // TikTok/Instagram/Pinterest
+            // TikTok/Instagram/Pinterest: Often single-file formats work best
             formatSelect = 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
         }
 
