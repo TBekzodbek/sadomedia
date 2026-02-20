@@ -151,11 +151,17 @@ async function getVideoInfo(url) {
                 noCheckCertificates: true,
                 geoBypass: true,
                 cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
-                ffmpegLocation: FFMPEG_LOCATION
+                ffmpegLocation: FFMPEG_LOCATION,
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
             };
 
-            if (isYouTube && client !== 'default') {
-                flags.extractorArgs = `youtube:player_client=${client}`;
+            if (isYouTube) {
+                if (client !== 'default') {
+                    flags.extractorArgs = `youtube:player_client=${client}`;
+                }
+            } else {
+                // Add referer for IG/TikTok/etc
+                flags.referer = url;
             }
 
             const info = await youtubedl(url, flags, getYtDlpOptions());
@@ -227,10 +233,14 @@ async function downloadMedia(url, type, options = {}) {
         noCheckCertificates: true,
         geoBypass: true,
         cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
-        ffmpegLocation: FFMPEG_LOCATION
+        ffmpegLocation: FFMPEG_LOCATION,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
     };
 
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    if (!isYouTube) {
+        flags.referer = url;
+    }
 
     if (type === 'audio') {
         Object.assign(flags, {
@@ -246,13 +256,12 @@ async function downloadMedia(url, type, options = {}) {
         let formatSelect;
 
         if (isYouTube) {
-            // Priority: MP4 720p > Any MP4 up to 720p > Best Video+Audio > Best Overall
-            // Using ? to make constraints optional for better fallback
+            // Priority: MP4 up to target height > Best video+audio up to target height > Best overall
             formatSelect = isNumericHeight
-                ? `best[height<=${height}][ext=mp4]/bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best`
-                : 'best[height<=?720][ext=mp4]/best[ext=mp4]/bestvideo[height<=?720]+bestaudio/best';
+                ? `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${height}][ext=mp4]/bestvideo[height<=${height}]+bestaudio/best[height<=${height}]/best`
+                : 'bestvideo[height<=?720][ext=mp4]+bestaudio[ext=m4a]/best[height<=?720][ext=mp4]/bestvideo[height<=?720]+bestaudio/best';
         } else {
-            // TikTok/Instagram/Pinterest: Priority to 'best' single format (often no watermark)
+            // TikTok/Instagram/Pinterest
             formatSelect = 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
         }
 
