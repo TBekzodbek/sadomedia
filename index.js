@@ -454,7 +454,7 @@ function startBot() {
 
 
             // 1. Check if URL -> Video Download
-            if (text.match(/https?:\/\//)) {
+            if (text.match(/https?:\/\//i)) {
                 // debugSend removed here because processUrl sends its own status
                 processUrl(chatId, text, 'video');
                 return;

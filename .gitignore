@@ -7,5 +7,13 @@ downloads
 bin/
 data/
 .env
-verify_supabase.js
-downloads/
+test_downloads/
+test_*.js
+verify_*.js
+*.html
+*.txt
+*.json
+!package.json
+!package-lock.json
+!yt_urls.json
+!music_urls.json

@@ -50,11 +50,20 @@ function getYtDlpOptions() {
     return opts;
 }
 
-// Helper to clean URL from playlist parameters
+// Helper to clean URL from playlist parameters and extract URL from text
 function cleanUrl(url) {
-    if (!url) return url;
+    if (!url || typeof url !== 'string') return url;
+
+    // 1. Trim leading/trailing whitespace including newlines
+    let input = url.trim();
+
+    // 2. Extract the first URL-like string from the text
+    // Handles cases like: "Check this video! https://youtube.com/..."
+    const urlMatch = input.match(/https?:\/\/[^\s]+/i);
+    const targetUrl = urlMatch ? urlMatch[0] : input;
+
     try {
-        const u = new URL(url);
+        const u = new URL(targetUrl);
         if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
             // Remove 'list' param but keep other important ones like 'v'
             if (u.searchParams.has('list')) {
@@ -64,10 +73,11 @@ function cleanUrl(url) {
             }
             return u.toString();
         }
+        return u.toString();
     } catch (e) {
-        // Fallback to original if URL parsing fails
+        // Fallback to the extracted target or original if URL parsing fails
+        return targetUrl;
     }
-    return url;
 }
 
 async function searchVideo(query, limit = 5) {
@@ -120,7 +130,9 @@ async function searchMusic(query, limit = 50) {
 
 
 async function getVideoInfo(url) {
+    const originalUrl = url;
     url = cleanUrl(url);
+    console.log(`🔎 [youtubeService] getVideoInfo original: [${originalUrl.substring(0, 50)}${originalUrl.length > 50 ? '...' : ''}] -> cleaned: [${url}]`);
     const cacheKey = `info:${url}`;
     const cached = cache.get(cacheKey);
     if (cached) return cached;
@@ -198,7 +210,9 @@ async function getVideoTitle(url) {
 }
 
 async function downloadMedia(url, type, options = {}) {
+    const originalUrl = url;
     url = cleanUrl(url);
+    console.log(`🚀 [youtubeService] downloadMedia original: [${originalUrl.substring(0, 50)}${originalUrl.length > 50 ? '...' : ''}] -> cleaned: [${url}]`);
     const { outputPath, height } = options;
 
     let flags = {
@@ -315,4 +329,5 @@ module.exports = {
     getVideoInfo,
     getVideoTitle,
     downloadMedia,
+    cleanUrl,
 };
