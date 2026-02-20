@@ -104,6 +104,7 @@ let transientDb = {
     requests: {}, // { chatId: { url, title, type, timestamp } }
     results: {},  // { chatId: { total: [], page: 0 } }
     broadcasts: {}, // { chatId: { text, photo, etc } }
+    lyrics: {},     // { chatId: lyricsText }
 };
 
 function getRequest(chatId) {
@@ -139,6 +140,18 @@ function setBroadcastContent(chatId, data) {
         delete transientDb.broadcasts[chatId];
     } else {
         transientDb.broadcasts[chatId] = data;
+    }
+}
+
+function getLyrics(chatId) {
+    return transientDb.lyrics[chatId];
+}
+
+function setLyrics(chatId, data) {
+    if (data === null) {
+        delete transientDb.lyrics[chatId];
+    } else {
+        transientDb.lyrics[chatId] = data;
     }
 }
 
@@ -183,5 +196,7 @@ module.exports = {
     saveBroadcast,
     getLastBroadcast,
     getBroadcastContent,
-    setBroadcastContent
+    setBroadcastContent,
+    getLyrics,
+    setLyrics
 };

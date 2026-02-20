@@ -39,6 +39,8 @@ const TEXTS = {
         label_title: "🎵 Nomi",
         label_album: "💿 Albom",
         label_year: "📅 Yil",
+        label_lyrics: "📜 Qo'shiq matni",
+        btn_lyrics: "📜 Matnni ko'rish",
 
         // Safety
         warning_adult: "🚫 **Kechirasiz, ushbu kontent 18+ chekloviga ega yoki noto'g'ri so'zlarni o'z ichiga oladi.**\n\nBiz pornografik va zararli kontent tarqalishiga qarshimiz.",
@@ -89,6 +91,8 @@ const TEXTS = {
         label_title: "🎵 Номи",
         label_album: "💿 Альбом",
         label_year: "📅 Йил",
+        label_lyrics: "📜 Қўшиқ матни",
+        btn_lyrics: "📜 Матнни кўриш",
 
         // Safety
         warning_adult: "🚫 **Кечирасиз, ушбу контент 18+ чекловига эга ёки нотўғри сўзларни ўз ичига олади.**\n\nБиз порнографик ва зарарли контент тарқалишига қаршимиз.",
@@ -139,6 +143,8 @@ const TEXTS = {
         label_title: "🎵 Название",
         label_album: "💿 Альбом",
         label_year: "📅 Год",
+        label_lyrics: "📜 Текст песни",
+        btn_lyrics: "📜 Показать текст",
 
         // Safety
         warning_adult: "🚫 **Извините, этот контент имеет возрастное ограничение 18+ или содержит недопустимые слова.**\n\nМы против распространения порнографии и вредоносного контента.",
@@ -189,6 +195,8 @@ const TEXTS = {
         label_title: "🎵 Title",
         label_album: "💿 Album",
         label_year: "📅 Year",
+        label_lyrics: "📜 Lyrics",
+        btn_lyrics: "📜 Show Lyrics",
 
         // Safety
         warning_adult: "🚫 **Sorry, this content is restricted (18+) or contains inappropriate words.**\n\nWe are against the spread of pornography and harmful content.",

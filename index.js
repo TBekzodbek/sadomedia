@@ -11,7 +11,7 @@ const { searchVideo, searchMusic, getVideoInfo, getVideoTitle, downloadMedia } =
 const { recognizeAudio } = require('./utils/shazamService');
 const { getText } = require('./utils/localization');
 const { checkText, checkMetadata, addStrike, isUserBlocked, resetStrikes } = require('./utils/moderation');
-const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser, saveBroadcast, getLastBroadcast, getBroadcastContent, setBroadcastContent } = require('./utils/storage');
+const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser, saveBroadcast, getLastBroadcast, getBroadcastContent, setBroadcastContent, getLyrics, setLyrics } = require('./utils/storage');
 
 // GLOBAL ERROR HANDLERS
 process.on('uncaughtException', (error) => {
@@ -807,6 +807,17 @@ function startBot() {
                 return;
             }
 
+            // --- VIEW LYRICS ---
+            if (data === 'view_lyrics') {
+                const lyrics = getLyrics(chatId);
+                if (lyrics) {
+                    bot.sendMessage(chatId, `📜 **${getText(lang, 'label_lyrics')}:**\n\n${lyrics}`, { parse_mode: 'Markdown' });
+                } else {
+                    bot.answerCallbackQuery(query.id, { text: getText(lang, 'not_found'), show_alert: true });
+                }
+                return;
+            }
+
             // --- SEARCH SELECTION ---
             if (data.startsWith('sel_')) {
                 const videoId = data.replace('sel_', '');
@@ -1011,14 +1022,21 @@ function startBot() {
             await bot.deleteMessage(chatId, statusMsg.message_id);
 
             if (track) {
-                const { title, artist, album, year } = track;
+                const { title, artist, album, year, lyrics } = track;
                 const esc = (text) => (text || '').replace(/[_*`[\]()]/g, '\\$&');
                 const caption = `${getText(lang, 'shazam_found')}\n\n**${getText(lang, 'label_artist')}:** ${esc(artist)}\n**${getText(lang, 'label_title')}:** ${esc(title)}\n**${getText(lang, 'label_album')}:** ${esc(album)}\n**${getText(lang, 'label_year')}:** ${esc(year)}`;
+
+                const keyboard = [[{ text: '📥 Yuklab olish', callback_data: `search_${artist} - ${title}`.substring(0, 64) }]];
+
+                if (lyrics) {
+                    setLyrics(chatId, lyrics);
+                    keyboard.push([{ text: getText(lang, 'btn_lyrics'), callback_data: 'view_lyrics' }]);
+                }
 
                 await debugSend(chatId, caption, {
                     parse_mode: 'Markdown',
                     reply_markup: {
-                        inline_keyboard: [[{ text: '📥 Yuklab olish', callback_data: `search_${artist} - ${title}`.substring(0, 64) }]]
+                        inline_keyboard: keyboard
                     }
                 });
             } else {

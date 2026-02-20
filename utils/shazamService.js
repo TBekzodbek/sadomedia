@@ -58,7 +58,17 @@ async function recognizeAudio(buffer) {
         const recog = await Promise.race([recogPromise, timeoutPromise]);
 
         if (recog && (recog.title || recog.track)) {
-            return recog.track || recog;
+            const trackData = recog.track || recog;
+
+            // Extract lyrics if available
+            if (trackData.sections) {
+                const lyricsSection = trackData.sections.find(s => s.type === 'LYRICS');
+                if (lyricsSection && lyricsSection.text) {
+                    trackData.lyrics = lyricsSection.text.join('\n');
+                }
+            }
+
+            return trackData;
         }
         return null;
     } catch (e) {
