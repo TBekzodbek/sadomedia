@@ -823,6 +823,14 @@ function startBot() {
                 const videoId = data.replace('sel_', '');
                 const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
+                // Try to find the title from cached search results
+                let songTitle = 'Music';
+                const searchData = getResults(chatId);
+                if (searchData && searchData.total) {
+                    const found = searchData.total.find(e => e.id === videoId);
+                    if (found) songTitle = found.title;
+                }
+
                 bot.sendMessage(chatId, getText(lang, 'downloading'));
 
                 // Start "uploading audio" action loop
@@ -830,10 +838,10 @@ function startBot() {
 
                 // Auto-download Audio for music search
                 const options = {
-                    outputPath: path.join(DOWNLOADS_DIR, `${cleanFilename(entry.title || 'Music')}_${Date.now()}.%(ext)s`)
+                    outputPath: path.join(DOWNLOADS_DIR, `${cleanFilename(songTitle)}_${Date.now()}.%(ext)s`)
                 };
 
-                handleDownload(chatId, videoUrl, 'audio', options, title, {
+                handleDownload(chatId, videoUrl, 'audio', options, songTitle, {
                     reply_markup: {
                         inline_keyboard: [
                             [{ text: getText(lang, 'search_again'), callback_data: 'reset_music' }],
