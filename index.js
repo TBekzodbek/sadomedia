@@ -988,17 +988,22 @@ function startBot() {
 
             // Merge Lyrics Button if available
             const lyrics = getLyrics(chatId);
-            if (type === 'audio' && lyrics) {
-                if (!mediaOptions.reply_markup) mediaOptions.reply_markup = { inline_keyboard: [] };
 
-                // Check if lyrics button already exists to avoid duplicates
-                const hasLyricsBtn = mediaOptions.reply_markup.inline_keyboard.some(row =>
+            const addLyricsBtn = (menu) => {
+                if (!menu) return;
+                if (!menu.reply_markup) menu.reply_markup = { inline_keyboard: [] };
+
+                const hasBtn = menu.reply_markup.inline_keyboard.some(row =>
                     row.some(btn => btn.callback_data === 'view_lyrics')
                 );
 
-                if (!hasLyricsBtn) {
-                    mediaOptions.reply_markup.inline_keyboard.push([{ text: getText(lang, 'btn_lyrics'), callback_data: 'view_lyrics' }]);
+                if (!hasBtn) {
+                    menu.reply_markup.inline_keyboard.push([{ text: getText(lang, 'btn_lyrics'), callback_data: 'view_lyrics' }]);
                 }
+            };
+
+            if (type === 'audio' && lyrics) {
+                addLyricsBtn(mediaOptions);
             }
 
             if (type === 'audio') {
@@ -1019,7 +1024,13 @@ function startBot() {
             await fs.remove(filePath);
 
             // After download, show Home button or Custom Menu
-            const finalMenu = customMenu || getBackMenu(lang);
+            // Clone customMenu to avoid mutation
+            const finalMenu = customMenu ? JSON.parse(JSON.stringify(customMenu)) : getBackMenu(lang);
+
+            if (type === 'audio' && lyrics) {
+                addLyricsBtn(finalMenu);
+            }
+
             debugSend(chatId, getText(lang, 'done'), finalMenu);
 
         } catch (error) {
@@ -1058,6 +1069,8 @@ function startBot() {
 
             if (track) {
                 const { title, artist, album, year, lyrics } = track;
+                console.log(`🎶 [Shazam] Identified: ${artist} - ${title}. Lyrics found: ${!!lyrics}`);
+
                 const esc = (text) => (text || '').replace(/[_*`[\]()]/g, '\\$&');
                 const caption = `${getText(lang, 'shazam_found')}\n\n**${getText(lang, 'label_artist')}:** ${esc(artist)}\n**${getText(lang, 'label_title')}:** ${esc(title)}\n**${getText(lang, 'label_album')}:** ${esc(album)}\n**${getText(lang, 'label_year')}:** ${esc(year)}`;
 
