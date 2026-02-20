@@ -471,6 +471,9 @@ function startBot() {
 
             debugSend(chatId, getText(lang, 'searching'), { disable_notification: true });
 
+            // Clear previous lyrics for a new manual search
+            setLyrics(chatId, null);
+
             // Non-blocking search
             const searchQuery = `${text} audio`;
 
@@ -536,6 +539,8 @@ function startBot() {
         const statusMsg = await debugSend(chatId, getText(lang, 'processing'));
 
         try {
+            // Clear lyrics for new URL processing
+            setLyrics(chatId, null);
             // Safety Check
             const textSafety = checkText(url);
             if (!textSafety.safe) {
@@ -856,6 +861,7 @@ function startBot() {
 
             // --- RESET MUSIC ---
             if (data === 'reset_music') {
+                setLyrics(chatId, null);
                 await setUserState(chatId, STATES.WAITING_MUSIC);
                 debugSend(chatId, getText(lang, 'prompt_music'), getBackMenu(lang));
                 return;
@@ -864,6 +870,9 @@ function startBot() {
             // --- SEARCH FROM SHAZAM ---
             if (data.startsWith('search_')) {
                 const queryText = data.replace('search_', '');
+
+                // Keep existing lyrics if they were set by Shazam for this specific download flow
+                // But don't clear them here yet, as search_ is often the direct result of clicking Shazam's download
 
                 // Inject into search flow
                 await setUserState(chatId, STATES.WAITING_MUSIC);
@@ -977,6 +986,21 @@ function startBot() {
 
             bot.sendChatAction(chatId, type === 'audio' ? 'upload_voice' : 'upload_video');
 
+            // Merge Lyrics Button if available
+            const lyrics = getLyrics(chatId);
+            if (type === 'audio' && lyrics) {
+                if (!mediaOptions.reply_markup) mediaOptions.reply_markup = { inline_keyboard: [] };
+
+                // Check if lyrics button already exists to avoid duplicates
+                const hasLyricsBtn = mediaOptions.reply_markup.inline_keyboard.some(row =>
+                    row.some(btn => btn.callback_data === 'view_lyrics')
+                );
+
+                if (!hasLyricsBtn) {
+                    mediaOptions.reply_markup.inline_keyboard.push([{ text: getText(lang, 'btn_lyrics'), callback_data: 'view_lyrics' }]);
+                }
+            }
+
             if (type === 'audio') {
                 await bot.sendAudio(chatId, filePath, {
                     title: title || 'Audio',
@@ -1018,6 +1042,9 @@ function startBot() {
         const chatId = msg.chat.id;
         const lang = await getLang(chatId);
         const fileId = msg.voice ? msg.voice.file_id : msg.audio.file_id;
+
+        // Clear previous lyrics when starting a new Shazam recognition
+        setLyrics(chatId, null);
 
         bot.sendChatAction(chatId, 'record_voice');
         const statusMsg = await debugSend(chatId, getText(lang, 'searching'));
