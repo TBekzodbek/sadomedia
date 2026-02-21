@@ -152,32 +152,63 @@ async function getVideoInfo(url) {
                 geoBypass: true,
                 cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
                 ffmpegLocation: FFMPEG_LOCATION,
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
             };
 
             if (isYouTube) {
                 if (client !== 'default') {
                     flags.extractorArgs = `youtube:player_client=${client}`;
                 }
+            } else if (url.includes('instagram.com')) {
+                flags.addHeader = [
+                    'Accept-Language: en-US,en;q=0.9',
+                    'Sec-Fetch-Mode: navigate',
+                    'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+                ];
+                flags.referer = 'https://www.instagram.com/';
             } else {
-                // Add referer for IG/TikTok/etc
                 flags.referer = url;
             }
 
             const info = await youtubedl(url, flags, getYtDlpOptions());
 
-            if (info && !info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
-                info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
+            if (info) {
+                if (!info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
+                    info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
+                }
+                cache.set(cacheKey, info, 300);
+                return info;
             }
-
-            cache.set(cacheKey, info, 300);
-            return info;
         } catch (e) {
             console.warn(`⚠️ [youtubeService] Metadata fetch failed for ${client}: ${e.message}`);
+
+            // Instagram Fallback: try without cookies if it's a login/rate-limit issue
+            if (url.includes('instagram.com') && (e.message.includes('login') || e.message.includes('rate-limit'))) {
+                try {
+                    console.log(`🔎 [youtubeService] Retrying Instagram without cookies...`);
+                    const instaFlags = {
+                        dumpSingleJson: true,
+                        noWarnings: true,
+                        noPlaylist: true,
+                        forceIpv4: true,
+                        geoBypass: true,
+                        addHeader: ['Accept-Language: en-US,en;q=0.9'],
+                        referer: 'https://www.instagram.com/',
+                        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+                    };
+                    const info = await youtubedl(url, instaFlags, getYtDlpOptions());
+                    if (info) {
+                        cache.set(cacheKey, info, 300);
+                        return info;
+                    }
+                } catch (innerE) {
+                    console.warn(`⚠️ [youtubeService] Instagram no-cookies retry failed: ${innerE.message}`);
+                }
+            }
         }
     }
 
-    // FINAL FALLBACK for metadata: try without any specific client/extractor args
+    // FINAL FALLBACK
     try {
         console.log(`🔎 [youtubeService] Final fallback metadata fetch...`);
         const flags = {
@@ -187,13 +218,13 @@ async function getVideoInfo(url) {
             noCheckCertificates: true,
             geoBypass: true,
             cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
-            ffmpegLocation: FFMPEG_LOCATION
+            ffmpegLocation: FFMPEG_LOCATION,
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         };
+        if (url.includes('instagram.com')) flags.referer = 'https://www.instagram.com/';
+
         const info = await youtubedl(url, flags, getYtDlpOptions());
         if (info) {
-            if (!info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
-                info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
-            }
             cache.set(cacheKey, info, 300);
             return info;
         }
@@ -201,9 +232,7 @@ async function getVideoInfo(url) {
         console.warn(`⚠️ [youtubeService] Final metadata fallback failed: ${e.message}`);
     }
 
-
-
-    throw new Error('Could not fetch media metadata. Please check the link.');
+    throw new Error('Could not fetch media metadata. Please check the link or try again later.');
 }
 
 async function getVideoTitle(url) {
@@ -234,11 +263,19 @@ async function downloadMedia(url, type, options = {}) {
         geoBypass: true,
         cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
         ffmpegLocation: FFMPEG_LOCATION,
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     };
 
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-    if (!isYouTube) {
+
+    if (url.includes('instagram.com')) {
+        flags.addHeader = [
+            'Accept-Language: en-US,en;q=0.9',
+            'Sec-Fetch-Mode: navigate',
+            'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+        ];
+        flags.referer = 'https://www.instagram.com/';
+    } else if (!isYouTube) {
         flags.referer = url;
     }
 
@@ -303,6 +340,26 @@ async function downloadMedia(url, type, options = {}) {
                     if (fs.existsSync(foundPath)) return foundPath;
                 }
             } catch (innerError) {
+                // Instagram Fallback in download loop
+                if (url.includes('instagram.com') && (innerError.message.includes('login') || innerError.message.includes('rate-limit'))) {
+                    try {
+                        console.log('📡 [youtubeService] Instagram download failed with cookies, retrying without...');
+                        const instaFlags = { ...currentFlags };
+                        delete instaFlags.cookies;
+                        const result = await youtubedl(url, instaFlags, downloadOpts);
+                        const stdout = (typeof result === 'string') ? result : (result.stdout || '');
+                        const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
+                        const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
+                        if (destMatches.length > 0) {
+                            let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
+                            if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
+                            if (fs.existsSync(foundPath)) return foundPath;
+                        }
+                    } catch (instaErr) {
+                        console.warn(`⚠️ [youtubeService] Instagram no-cookies download retry failed: ${instaErr.message}`);
+                    }
+                }
+
                 // If it's an audio extraction error, try a simpler approach without extractAudio if it fails
                 if (type === 'audio' && (innerError.message.includes('ffprobe') || innerError.message.includes('codec'))) {
                     console.log('⚠️ [youtubeService] Audio extraction failed, trying simple bestaudio download (no conversion)...');
