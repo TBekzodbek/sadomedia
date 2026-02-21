@@ -461,23 +461,31 @@ function startBot() {
                 return;
             }
 
-            // --- SMART HANDLING (MAIN STATE) ---
+            // --- SMART HANDLING (MAIN STATE / SEARCHING) ---
             const state = await getUserState(chatId);
 
+            // 1. If it's a URL, handle it directly based on state
+            if (text.match(/https?:\/\//i)) {
+                // If in music mode, treat URL as audio request
+                const typeContext = (state === STATES.WAITING_MUSIC) ? 'audio' : 'video';
+                console.log(`🔗 [index] URL detected in state ${state}. Processing as ${typeContext}...`);
+                await processUrl(chatId, text, typeContext);
+                return;
+            }
+
+            // 2. If restricted or blocked, don't proceed 
+            if (isUserBlocked(chatId)) {
+                bot.sendMessage(chatId, getText(lang, 'user_blocked'));
+                return;
+            }
+
+            // 3. Mode-specific handling
             if (state === STATES.WAITING_VIDEO) {
                 await processUrl(chatId, text, 'video');
                 return;
             }
 
-
-            // 1. Check if URL -> Video Download
-            if (text.match(/https?:\/\//i)) {
-                // debugSend removed here because processUrl sends its own status
-                processUrl(chatId, text, 'video');
-                return;
-            }
-
-            // 2. If Text -> Music Search
+            // Default: Any text in MAIN or WAITING_MUSIC is a music search
             const safety = checkText(text);
             if (!safety.safe) {
                 const strikeData = addStrike(chatId);
@@ -494,7 +502,7 @@ function startBot() {
             // Non-blocking search
             const searchQuery = `${text} audio`;
 
-            searchMusic(searchQuery, 50).then(output => {
+            searchMusic(searchQuery, 75).then(output => {
                 const entries = output.entries || (Array.isArray(output) ? output : [output]);
 
                 if (!entries || entries.length === 0) {
@@ -551,7 +559,7 @@ function startBot() {
         return () => clearInterval(interval);
     };
 
-    async function processUrl(chatId, url, typeContext) {
+    async function processUrl(chatId, url, typeContext = 'video') {
         const lang = await getLang(chatId);
         const statusMsg = await debugSend(chatId, getText(lang, 'processing'));
 
@@ -578,7 +586,7 @@ function startBot() {
             const title = info.title || 'Media';
             const safeTitle = cleanFilename(title);
 
-            const type = 'video';
+            const type = typeContext || 'video';
 
             await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
 
@@ -598,7 +606,7 @@ function startBot() {
                 }
             };
 
-            const stopAction = sendActionLoop(chatId, 'upload_video');
+            const stopAction = sendActionLoop(chatId, type === 'audio' ? 'upload_voice' : 'upload_video');
             try {
                 await handleDownload(chatId, url, type, options, title, null, mediaOptions);
             } finally {

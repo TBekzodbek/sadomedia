@@ -246,8 +246,10 @@ async function downloadMedia(url, type, options = {}) {
         Object.assign(flags, {
             extractAudio: true,
             audioFormat: 'mp3',
-            audioQuality: '0', // Best quality
-            ffmpegLocation: FFMPEG_LOCATION
+            audioQuality: '0',
+            ffmpegLocation: FFMPEG_LOCATION,
+            // Fallback to allow multi-stream if needed
+            format: 'bestaudio/best'
         });
         console.log(`🎵 [youtubeService] Audio download flags:`, flags);
     } else if (type === 'video') {
@@ -302,8 +304,8 @@ async function downloadMedia(url, type, options = {}) {
                 }
             } catch (innerError) {
                 // If it's an audio extraction error, try a simpler approach without extractAudio if it fails
-                if (type === 'audio' && innerError.message.includes('ffprobe')) {
-                    console.log('⚠️ [youtubeService] ffprobe failed during extraction, trying simple bestaudio download...');
+                if (type === 'audio' && (innerError.message.includes('ffprobe') || innerError.message.includes('codec'))) {
+                    console.log('⚠️ [youtubeService] Audio extraction failed, trying simple bestaudio download (no conversion)...');
                     const simpleFlags = { ...currentFlags };
                     delete simpleFlags.extractAudio;
                     delete simpleFlags.audioFormat;
@@ -325,7 +327,10 @@ async function downloadMedia(url, type, options = {}) {
             }
 
             const base = outputPath.replace('.%(ext)s', '');
-            const extensions = type === 'audio' ? ['.mp3', '.m4a', '.webm', '.aac'] : ['.mp4', '.mkv', '.webm'];
+            const extensions = type === 'audio'
+                ? ['.mp3', '.m4a', '.webm', '.aac', '.ogg', '.opus', '.wav']
+                : ['.mp4', '.mkv', '.webm', '.ts', '.mov', '.avi'];
+
             for (const ext of extensions) {
                 const fallbackPath = base + ext;
                 if (fs.existsSync(fallbackPath)) return fallbackPath;
@@ -343,13 +348,15 @@ async function downloadMedia(url, type, options = {}) {
         const finalFlags = { ...flags, format: 'best' };
         if (type === 'audio') {
             delete finalFlags.extractAudio; // Try without extraction in final fallback
+            delete finalFlags.audioFormat;
+            delete finalFlags.audioQuality;
             finalFlags.format = 'bestaudio/best';
         }
 
         await youtubedl(url, finalFlags, fallbackOpts);
 
         const base = outputPath.replace('.%(ext)s', '');
-        const exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.aac'];
+        const exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.aac', '.ogg', '.opus', '.ts'];
         for (const ext of exts) {
             const fb = base + ext;
             if (fs.existsSync(fb)) return fb;
