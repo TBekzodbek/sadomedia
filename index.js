@@ -464,12 +464,10 @@ function startBot() {
             // --- SMART HANDLING (MAIN STATE / SEARCHING) ---
             const state = await getUserState(chatId);
 
-            // 1. If it's a URL, handle it directly based on state
+            // 1. If it's a URL, handle it always as video first
             if (text.match(/https?:\/\//i)) {
-                // If in music mode, treat URL as audio request
-                const typeContext = (state === STATES.WAITING_MUSIC) ? 'audio' : 'video';
-                console.log(`🔗 [index] URL detected in state ${state}. Processing as ${typeContext}...`);
-                await processUrl(chatId, text, typeContext);
+                console.log(`🔗 [index] URL detected. Processing as video...`);
+                await processUrl(chatId, text, 'video');
                 return;
             }
 
