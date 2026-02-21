@@ -40,7 +40,7 @@ const TEXTS = {
         label_album: "💿 Albom",
         label_year: "📅 Yil",
         label_lyrics: "📜 Qo'shiq matni",
-        btn_lyrics: "📜 Matnni ko'rish",
+        btn_lyrics: "🎼 Qo'shiq matni",
 
         // Safety
         warning_adult: "🚫 **Kechirasiz, ushbu kontent 18+ chekloviga ega yoki noto'g'ri so'zlarni o'z ichiga oladi.**\n\nBiz pornografik va zararli kontent tarqalishiga qarshimiz.",
@@ -49,7 +49,9 @@ const TEXTS = {
 
         menu_share: "📣 Botni ulashish",
         share_text: "🚀 **SadoMedia Bot** - YouTube, Instagram, TikTok dan video yuklash va musiqalar topish uchun eng yaxshi yordamchingiz!\n\nBotni bu yerda topishingiz mumkin: @{username}",
-        btn_share: "📲 Ulashish"
+        btn_share: "📲 Ulashish",
+        btn_audio_version: "🎧 Audio talqini",
+        btn_find_music: "🔍 Musiqasini topish"
     },
     uz_cyrl: {
         welcome: "🌟 **Ассалому алайкум! SadoMedia Bot га хуш келибсиз!**\n\n🤖 **Мен орқали сиз қуйидаги ижтимоий тармоқлардан видео юклашингиз мумкин:**\n• YouTube, Instagram, TikTok 📥\n\n• Мусиқа топишингиз 🎵\n\n👇 **Фойдаланиш учун:**\n\n1. 🎵 **Мусиқа:** Ижрочи ёки қўшиқ номи юборинг.\n2. 📹 **Медиа:** Ҳаволани (link) юборинг.",
@@ -92,7 +94,7 @@ const TEXTS = {
         label_album: "💿 Альбом",
         label_year: "📅 Йил",
         label_lyrics: "📜 Қўшиқ матни",
-        btn_lyrics: "📜 Матнни кўриш",
+        btn_lyrics: "🎼 Қўшиқ матни",
 
         // Safety
         warning_adult: "🚫 **Кечирасиз, ушбу контент 18+ чекловига эга ёки нотўғри сўзларни ўз ичига олади.**\n\nБиз порнографик ва зарарли контент тарқалишига қаршимиз.",
@@ -101,7 +103,9 @@ const TEXTS = {
 
         menu_share: "📣 Ботни улашиш",
         share_text: "🚀 **SadoMedia Bot** - YouTube, Instagram, TikTok дан видео юклаш va мусиқалар топиш учун энг яхши ёрдамчингиз!\n\nБотни бу ерда топишингиз мумкин: @{username}",
-        btn_share: "📲 Улашиш"
+        btn_share: "📲 Улашиш",
+        btn_audio_version: "🎧 Аудио талқини",
+        btn_find_music: "🔍 Мусиқасини топиш"
     },
     ru: {
         welcome: "🌟 **Привет! Добро пожаловать в SadoMedia Bot!**\n\n🤖 **Я могу скачивать видео из следующих соцсетей:**\n• YouTube, Instagram, TikTok 📥\n\n• Находить музыку 🎵\n\n👇 **Как пользоваться:**\n\n1. 🎵 **Музыка:** Отправьте имя исполнителя или название песни.\n2. 📹 **Медиа:** Отправьте ссылку (link).",
@@ -144,7 +148,7 @@ const TEXTS = {
         label_album: "💿 Альбом",
         label_year: "📅 Год",
         label_lyrics: "📜 Текст песни",
-        btn_lyrics: "📜 Показать текст",
+        btn_lyrics: "🎼 Текст песни",
 
         // Safety
         warning_adult: "🚫 **Извините, этот контент имеет возрастное ограничение 18+ или содержит недопустимые слова.**\n\nМы против распространения порнографии и вредоносного контента.",
@@ -153,7 +157,9 @@ const TEXTS = {
 
         menu_share: "📣 Поделиться ботом",
         share_text: "🚀 **SadoMedia Bot** - Ваш лучший помощник для скачивания видео из YouTube, Instagram, TikTok и поиска музыки!\n\nВы можете найти бота здесь: @{username}",
-        btn_share: "📲 Поделиться"
+        btn_share: "📲 Поделиться",
+        btn_audio_version: "🎧 Аудио версия видео",
+        btn_find_music: "🔍 Найти музыку"
     },
     en: {
         welcome: "🌟 **Hello! Welcome to SadoMedia Bot!**\n\n🤖 **I can download videos from:**\n• YouTube, Instagram, TikTok 📥\n\n• Find music 🎵\n\n👇 **How to use:**\n\n1. 🎵 **Music:** Send Artist/Song name.\n2. 📹 **Media:** Send link.",
@@ -196,7 +202,7 @@ const TEXTS = {
         label_album: "💿 Album",
         label_year: "📅 Year",
         label_lyrics: "📜 Lyrics",
-        btn_lyrics: "📜 Show Lyrics",
+        btn_lyrics: "🎼 Text of the music",
 
         // Safety
         warning_adult: "🚫 **Sorry, this content is restricted (18+) or contains inappropriate words.**\n\nWe are against the spread of pornography and harmful content.",
@@ -205,7 +211,9 @@ const TEXTS = {
 
         menu_share: "📣 Share Bot",
         share_text: "🚀 **SadoMedia Bot** - Your best assistant for downloading videos from YouTube, Instagram, TikTok and finding music!\n\nYou can find the bot here: @{username}",
-        btn_share: "📲 Share"
+        btn_share: "📲 Share",
+        btn_audio_version: "🎧 Audio version of the video",
+        btn_find_music: "🔍 Find music in video"
     }
 };
 

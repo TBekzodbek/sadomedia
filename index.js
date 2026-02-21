@@ -7,7 +7,7 @@ const axios = require('axios');
 
 // Import Services
 const { cleanFilename } = require('./utils/helpers');
-const { searchVideo, searchMusic, getVideoInfo, getVideoTitle, downloadMedia } = require('./utils/youtubeService');
+const { searchVideo, searchMusic, getVideoInfo, getVideoTitle, downloadMedia, downloadSnippet } = require('./utils/youtubeService');
 const { recognizeAudio } = require('./utils/shazamService');
 const { getText } = require('./utils/localization');
 const { checkText, checkMetadata, addStrike, isUserBlocked, resetStrikes } = require('./utils/moderation');
@@ -196,6 +196,23 @@ function startBot() {
     // Aliases to match existing code usage
     const setUserState = setState;
     const getUserState = getState;
+
+    const addLyricsBtn = (chatId, lang, menu) => {
+        if (!menu) return;
+        const lyrics = getLyrics(chatId);
+        if (!lyrics) return;
+
+        if (!menu.reply_markup) menu.reply_markup = { inline_keyboard: [] };
+        if (!menu.reply_markup.inline_keyboard) menu.reply_markup.inline_keyboard = [];
+
+        const hasBtn = menu.reply_markup.inline_keyboard.some(row =>
+            row.some(btn => btn.callback_data === 'view_lyrics')
+        );
+
+        if (!hasBtn) {
+            menu.reply_markup.inline_keyboard.push([{ text: getText(lang, 'btn_lyrics'), callback_data: 'view_lyrics' }]);
+        }
+    };
 
     const debugSend = (chatId, text, options = {}) => {
         // Log with ID for debugging, but send clean text to user
@@ -575,7 +592,8 @@ function startBot() {
             const mediaOptions = {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🎧 MP3', callback_data: 'target_mp3' }]
+                        [{ text: getText(lang, 'btn_audio_version'), callback_data: 'target_mp3' }],
+                        [{ text: getText(lang, 'btn_find_music'), callback_data: 'recognize_video' }]
                     ]
                 }
             };
@@ -823,6 +841,50 @@ function startBot() {
                 return;
             }
 
+            // --- RECOGNIZE VIDEO MUSIC ---
+            if (data === 'recognize_video') {
+                const reqData = getRequest(chatId);
+                if (!reqData || !reqData.url) {
+                    bot.sendMessage(chatId, getText(lang, 'session_expired'));
+                    return;
+                }
+
+                const statusMsg = await debugSend(chatId, getText(lang, 'searching'));
+                bot.sendChatAction(chatId, 'record_voice');
+
+                try {
+                    const buffer = await downloadSnippet(reqData.url, 15);
+                    if (!buffer) throw new Error('Could not extract audio');
+
+                    const track = await recognizeAudio(buffer);
+                    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+
+                    if (track) {
+                        const { title, artist, album, year, lyrics } = track;
+                        const esc = (text) => (text || '').replace(/[_*`[\]()]/g, '\\$&');
+                        const caption = `${getText(lang, 'shazam_found')}\n\n**${getText(lang, 'label_artist')}:** ${esc(artist)}\n**${getText(lang, 'label_title')}:** ${esc(title)}\n**${getText(lang, 'label_album')}:** ${esc(album)}\n**${getText(lang, 'label_year')}:** ${esc(year)}`;
+
+                        const keyboard = [[{ text: '📥 Yuklab olish', callback_data: `search_${artist} - ${title}`.substring(0, 64) }]];
+                        if (lyrics) {
+                            setLyrics(chatId, lyrics);
+                            keyboard.push([{ text: getText(lang, 'btn_lyrics'), callback_data: 'view_lyrics' }]);
+                        }
+
+                        debugSend(chatId, caption, {
+                            parse_mode: 'Markdown',
+                            reply_markup: { inline_keyboard: keyboard }
+                        });
+                    } else {
+                        debugSend(chatId, getText(lang, 'shazam_not_found'), getBackMenu(lang));
+                    }
+                } catch (error) {
+                    console.error('Recognize Video Error:', error);
+                    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+                    debugSend(chatId, getText(lang, 'error'), getBackMenu(lang));
+                }
+                return;
+            }
+
             // --- SEARCH SELECTION ---
             if (data.startsWith('sel_')) {
                 const videoId = data.replace('sel_', '');
@@ -910,7 +972,14 @@ function startBot() {
                     }
                     searchKeyboard.push(controlRow);
 
-                    debugSend(chatId, `🎶 **Natijalar:**`, { reply_markup: { inline_keyboard: searchKeyboard } });
+                    // Add Lyrics button if available (from Shazam)
+                    const menu = { reply_markup: { inline_keyboard: searchKeyboard } };
+                    addLyricsBtn(chatId, lang, menu);
+
+                    debugSend(chatId, `🎶 **Natijalar:**`, {
+                        parse_mode: 'Markdown',
+                        ...menu
+                    });
                 }).finally(() => stopAction());
                 return;
             }
@@ -987,24 +1056,7 @@ function startBot() {
             bot.sendChatAction(chatId, type === 'audio' ? 'upload_voice' : 'upload_video');
 
             // Merge Lyrics Button if available
-            const lyrics = getLyrics(chatId);
-
-            const addLyricsBtn = (menu) => {
-                if (!menu) return;
-                if (!menu.reply_markup) menu.reply_markup = { inline_keyboard: [] };
-
-                const hasBtn = menu.reply_markup.inline_keyboard.some(row =>
-                    row.some(btn => btn.callback_data === 'view_lyrics')
-                );
-
-                if (!hasBtn) {
-                    menu.reply_markup.inline_keyboard.push([{ text: getText(lang, 'btn_lyrics'), callback_data: 'view_lyrics' }]);
-                }
-            };
-
-            if (type === 'audio' && lyrics) {
-                addLyricsBtn(mediaOptions);
-            }
+            addLyricsBtn(chatId, lang, mediaOptions);
 
             if (type === 'audio') {
                 await bot.sendAudio(chatId, filePath, {
@@ -1027,9 +1079,7 @@ function startBot() {
             // Clone customMenu to avoid mutation
             const finalMenu = customMenu ? JSON.parse(JSON.stringify(customMenu)) : getBackMenu(lang);
 
-            if (type === 'audio' && lyrics) {
-                addLyricsBtn(finalMenu);
-            }
+            addLyricsBtn(chatId, lang, finalMenu);
 
             debugSend(chatId, getText(lang, 'done'), finalMenu);
 

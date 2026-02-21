@@ -287,21 +287,45 @@ async function downloadMedia(url, type, options = {}) {
             const downloadOpts = getYtDlpOptions();
             downloadOpts.timeout = 300000; // 5 minutes for download
 
-            const result = await youtubedl(url, currentFlags, downloadOpts);
+            try {
+                const result = await youtubedl(url, currentFlags, downloadOpts);
 
-            // Extract path from stdout if possible
-            const stdout = (typeof result === 'string') ? result : (result.stdout || '');
-            const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
-            const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
+                // Extract path from stdout if possible
+                const stdout = (typeof result === 'string') ? result : (result.stdout || '');
+                const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
+                const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
 
-            if (destMatches.length > 0) {
-                let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
-                if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
-                if (fs.existsSync(foundPath)) return foundPath;
+                if (destMatches.length > 0) {
+                    let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
+                    if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
+                    if (fs.existsSync(foundPath)) return foundPath;
+                }
+            } catch (innerError) {
+                // If it's an audio extraction error, try a simpler approach without extractAudio if it fails
+                if (type === 'audio' && innerError.message.includes('ffprobe')) {
+                    console.log('⚠️ [youtubeService] ffprobe failed during extraction, trying simple bestaudio download...');
+                    const simpleFlags = { ...currentFlags };
+                    delete simpleFlags.extractAudio;
+                    delete simpleFlags.audioFormat;
+                    delete simpleFlags.audioQuality;
+                    simpleFlags.format = 'bestaudio/best';
+
+                    const result = await youtubedl(url, simpleFlags, downloadOpts);
+                    const stdout = (typeof result === 'string') ? result : (result.stdout || '');
+                    const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
+                    const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
+                    if (destMatches.length > 0) {
+                        let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
+                        if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
+                        if (fs.existsSync(foundPath)) return foundPath;
+                    }
+                } else {
+                    throw innerError;
+                }
             }
 
             const base = outputPath.replace('.%(ext)s', '');
-            const extensions = type === 'audio' ? ['.mp3', '.m4a'] : ['.mp4', '.mkv', '.webm'];
+            const extensions = type === 'audio' ? ['.mp3', '.m4a', '.webm', '.aac'] : ['.mp4', '.mkv', '.webm'];
             for (const ext of extensions) {
                 const fallbackPath = base + ext;
                 if (fs.existsSync(fallbackPath)) return fallbackPath;
@@ -316,11 +340,16 @@ async function downloadMedia(url, type, options = {}) {
     try {
         const fallbackOpts = getYtDlpOptions();
         fallbackOpts.timeout = 300000;
+        const finalFlags = { ...flags, format: 'best' };
+        if (type === 'audio') {
+            delete finalFlags.extractAudio; // Try without extraction in final fallback
+            finalFlags.format = 'bestaudio/best';
+        }
 
-        await youtubedl(url, { ...flags, format: 'best' }, fallbackOpts);
+        await youtubedl(url, finalFlags, fallbackOpts);
 
         const base = outputPath.replace('.%(ext)s', '');
-        const exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv'];
+        const exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.aac'];
         for (const ext of exts) {
             const fb = base + ext;
             if (fs.existsSync(fb)) return fb;
@@ -332,11 +361,52 @@ async function downloadMedia(url, type, options = {}) {
     throw new Error(lastError ? lastError.message : 'Download failed completely.');
 }
 
+async function downloadSnippet(url, duration = 15) {
+    url = cleanUrl(url);
+    const tempDir = path.join(__dirname, '../downloads');
+    await fs.ensureDir(tempDir);
+    const snippetPath = path.join(tempDir, `snippet_${Date.now()}.mp3`);
+
+    try {
+        const flags = {
+            extractAudio: true,
+            audioFormat: 'mp3',
+            noPlaylist: true,
+            postprocessorArgs: `ffmpeg:-t ${duration}`,
+            output: snippetPath,
+            forceIpv4: true,
+            noCheckCertificates: true,
+            geoBypass: true,
+            cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
+            ffmpegLocation: FFMPEG_LOCATION,
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+        };
+
+        if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+            flags.referer = url;
+        }
+
+        await youtubedl(url, flags, getYtDlpOptions());
+
+        if (await fs.pathExists(snippetPath)) {
+            const buffer = await fs.readFile(snippetPath);
+            await fs.remove(snippetPath);
+            return buffer;
+        }
+        return null;
+    } catch (e) {
+        console.error('downloadSnippet Error:', e.message);
+        if (await fs.pathExists(snippetPath)) await fs.remove(snippetPath);
+        return null;
+    }
+}
+
 module.exports = {
     searchVideo,
     searchMusic,
     getVideoInfo,
     getVideoTitle,
     downloadMedia,
+    downloadSnippet,
     cleanUrl,
 };
