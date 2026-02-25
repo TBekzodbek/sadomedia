@@ -602,11 +602,19 @@ function startBot() {
             const caption = `📌 **${esc(title)}**\n\n${getText(lang, 'select_quality')}`;
 
             if (info.thumbnail) {
-                await bot.sendPhoto(chatId, info.thumbnail, {
-                    caption: caption,
-                    parse_mode: 'Markdown',
-                    ...menu
-                });
+                try {
+                    await bot.sendPhoto(chatId, info.thumbnail, {
+                        caption: caption,
+                        parse_mode: 'Markdown',
+                        ...menu
+                    });
+                } catch (photoErr) {
+                    console.warn('⚠️ sendPhoto failed, falling back to sendMessage:', photoErr.message);
+                    await bot.sendMessage(chatId, caption, {
+                        parse_mode: 'Markdown',
+                        ...menu
+                    });
+                }
             } else {
                 await bot.sendMessage(chatId, caption, {
                     parse_mode: 'Markdown',

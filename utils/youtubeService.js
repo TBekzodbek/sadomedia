@@ -172,7 +172,10 @@ async function getVideoInfo(url) {
 
             if (info) {
                 if (!info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
-                    info.thumbnail = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0))[0].url;
+                    // Telegram doesn't like .webp via URL in sendPhoto, prefer jpg/png
+                    const sorted = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0));
+                    const preferred = sorted.find(t => t.url && !t.url.includes('.webp')) || sorted[0];
+                    info.thumbnail = preferred.url;
                 }
                 cache.set(cacheKey, info, 300);
                 return info;
