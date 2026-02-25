@@ -570,6 +570,7 @@ function startBot() {
                 const strikeData = addStrike(chatId);
                 debugSend(chatId, getText(lang, 'warning_adult'));
                 debugSend(chatId, getText(lang, 'warning_strike').replace('{count}', strikeData.count));
+                await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
                 return;
             }
 
@@ -584,35 +585,39 @@ function startBot() {
             const title = info.title || 'Media';
             const safeTitle = cleanFilename(title);
 
-            const type = typeContext || 'video';
+            setRequest(chatId, { url, title: title, type: 'video' });
 
-            await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
-
-            setRequest(chatId, { url, title: title, type: type });
-
-            const options = {
-                outputPath: path.join(DOWNLOADS_DIR, `${safeTitle}_${Date.now()}.%(ext)s`),
-                height: 'best'
-            };
-
-            const mediaOptions = {
+            const menu = {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: getText(lang, 'btn_audio_version'), callback_data: 'target_mp3' }],
-                        [{ text: getText(lang, 'btn_find_music'), callback_data: 'recognize_video' }]
+                        [{ text: getText(lang, 'btn_video'), callback_data: 'target_video' }, { text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
+                        [{ text: getText(lang, 'btn_music'), callback_data: 'target_music' }]
                     ]
                 }
             };
 
-            const stopAction = sendActionLoop(chatId, type === 'audio' ? 'upload_voice' : 'upload_video');
-            try {
-                await handleDownload(chatId, url, type, options, title, null, mediaOptions);
-            } finally {
-                stopAction();
+            await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+
+            const esc = (text) => (text || '').replace(/[_*`[\]()]/g, '\\$&');
+            const caption = `📌 **${esc(title)}**\n\n${getText(lang, 'select_quality')}`;
+
+            if (info.thumbnail) {
+                await bot.sendPhoto(chatId, info.thumbnail, {
+                    caption: caption,
+                    parse_mode: 'Markdown',
+                    ...menu
+                });
+            } else {
+                await bot.sendMessage(chatId, caption, {
+                    parse_mode: 'Markdown',
+                    ...menu
+                });
             }
+
         } catch (error) {
             console.error('processUrl Error:', error);
             const l = await getLang(chatId);
+            await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
             debugSend(chatId, getText(l, 'error'), getBackMenu(l));
         }
     }
@@ -847,12 +852,16 @@ function startBot() {
                 return;
             }
 
-            // --- RECOGNIZE VIDEO MUSIC ---
-            if (data === 'recognize_video') {
+            // --- RECOGNIZE VIDEO MUSIC (Find & Download) ---
+            if (data === 'recognize_video' || data === 'target_music') {
                 const reqData = getRequest(chatId);
                 if (!reqData || !reqData.url) {
                     bot.sendMessage(chatId, getText(lang, 'session_expired'));
                     return;
+                }
+
+                if (data === 'target_music') {
+                    bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
                 }
 
                 const statusMsg = await debugSend(chatId, getText(lang, 'searching'));
@@ -863,28 +872,66 @@ function startBot() {
                     if (!buffer) throw new Error('Could not extract audio');
 
                     const track = await recognizeAudio(buffer);
-                    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
 
                     if (track) {
                         const { title, artist, album, year, lyrics } = track;
+                        const queryStr = `${artist} - ${title}`;
                         const esc = (text) => (text || '').replace(/[_*`[\]()]/g, '\\$&');
-                        const caption = `${getText(lang, 'shazam_found')}\n\n**${getText(lang, 'label_artist')}:** ${esc(artist)}\n**${getText(lang, 'label_title')}:** ${esc(title)}\n**${getText(lang, 'label_album')}:** ${esc(album)}\n**${getText(lang, 'label_year')}:** ${esc(year)}`;
 
-                        const keyboard = [[{ text: '📥 Yuklab olish', callback_data: `search_${artist} - ${title}`.substring(0, 64) }]];
-                        if (lyrics) {
-                            setLyrics(chatId, lyrics);
-                            keyboard.push([{ text: getText(lang, 'btn_lyrics'), callback_data: 'view_lyrics' }]);
+                        await bot.editMessageText(`🎵 **Topildi:** ${esc(artist)} - ${esc(title)}\n⏳ Yuklanmoqda...`, {
+                            chat_id: chatId,
+                            message_id: statusMsg.message_id,
+                            parse_mode: 'Markdown'
+                        }).catch(() => { });
+
+                        try {
+                            // Automatic Search & Download
+                            const searchResult = await searchMusic(queryStr, 1);
+                            const entries = searchResult.entries || (Array.isArray(searchResult) ? searchResult : [searchResult]);
+
+                            if (entries && entries.length > 0) {
+                                const foundUrl = `https://www.youtube.com/watch?v=${entries[0].id}`;
+                                const options = {
+                                    outputPath: path.join(DOWNLOADS_DIR, `${cleanFilename(queryStr)}_${Date.now()}.%(ext)s`),
+                                    audioQuality: '0' // Best quality
+                                };
+
+                                if (lyrics) setLyrics(chatId, lyrics);
+
+                                const stopAction = sendActionLoop(chatId, 'upload_voice');
+                                try {
+                                    await handleDownload(chatId, foundUrl, 'audio', options, queryStr);
+                                    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+                                    return; // Success
+                                } finally {
+                                    stopAction();
+                                }
+                            }
+                        } catch (innerError) {
+                            console.warn(`⚠️ Search/Download for found music failed: ${innerError.message}. Falling back...`);
                         }
-
-                        debugSend(chatId, caption, {
-                            parse_mode: 'Markdown',
-                            reply_markup: { inline_keyboard: keyboard }
-                        });
-                    } else {
-                        debugSend(chatId, getText(lang, 'shazam_not_found'), getBackMenu(lang));
                     }
+
+                    // Fallback: If not found, search failed, or download failed, download original audio
+                    await bot.editMessageText(`⚠️ Musiqani aniqlab bo'lmadi yoki topilmadi. Oddiy audio yuklanmoqda...`, {
+                        chat_id: chatId,
+                        message_id: statusMsg.message_id
+                    }).catch(() => { });
+
+                    const options = {
+                        outputPath: path.join(DOWNLOADS_DIR, `${cleanFilename(reqData.title)}_${Date.now()}.%(ext)s`),
+                        audioQuality: '0'
+                    };
+                    const stopAction = sendActionLoop(chatId, 'upload_voice');
+                    try {
+                        await handleDownload(chatId, reqData.url, 'audio', options, reqData.title);
+                    } finally {
+                        stopAction();
+                    }
+                    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+
                 } catch (error) {
-                    console.error('Recognize Video Error:', error);
+                    console.error('Music Download Error:', error);
                     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
                     debugSend(chatId, getText(lang, 'error'), getBackMenu(lang));
                 }
@@ -1063,6 +1110,16 @@ function startBot() {
 
             // Merge Lyrics Button if available
             addLyricsBtn(chatId, lang, mediaOptions);
+
+            // Ensure we have some buttons for switching if it was a video download
+            if (type === 'video' && (!mediaOptions.reply_markup || !mediaOptions.reply_markup.inline_keyboard)) {
+                mediaOptions.reply_markup = {
+                    inline_keyboard: [
+                        [{ text: getText(lang, 'btn_audio_version'), callback_data: 'target_mp3' }],
+                        [{ text: getText(lang, 'btn_find_music'), callback_data: 'recognize_video' }]
+                    ]
+                };
+            }
 
             if (type === 'audio') {
                 await bot.sendAudio(chatId, filePath, {

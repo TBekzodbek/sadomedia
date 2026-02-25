@@ -50,6 +50,9 @@ const TEXTS = {
         menu_share: "📣 Botni ulashish",
         share_text: "🚀 **SadoMedia Bot** - YouTube, Instagram, TikTok dan video yuklash va musiqalar topish uchun eng yaxshi yordamchingiz!\n\nBotni bu yerda topishingiz mumkin: @{username}",
         btn_share: "📲 Ulashish",
+        btn_video: "🎬 Video",
+        btn_audio: "🎧 Audio (MP3)",
+        btn_music: "🎵 Musiqa (Topish va Yuklash)",
         btn_audio_version: "🎧 Audio talqini",
         btn_find_music: "🔍 Musiqasini topish"
     },
@@ -104,6 +107,9 @@ const TEXTS = {
         menu_share: "📣 Ботни улашиш",
         share_text: "🚀 **SadoMedia Bot** - YouTube, Instagram, TikTok дан видео юклаш va мусиқалар топиш учун энг яхши ёрдамчингиз!\n\nБотни бу ерда топишингиз мумкин: @{username}",
         btn_share: "📲 Улашиш",
+        btn_video: "🎬 Видео",
+        btn_audio: "🎧 Аудио (MP3)",
+        btn_music: "🎵 Мусиқа (Топиш ва Юклаш)",
         btn_audio_version: "🎧 Аудио талқини",
         btn_find_music: "🔍 Мусиқасини топиш"
     },
@@ -158,6 +164,9 @@ const TEXTS = {
         menu_share: "📣 Поделиться ботом",
         share_text: "🚀 **SadoMedia Bot** - Ваш лучший помощник для скачивания видео из YouTube, Instagram, TikTok и поиска музыки!\n\nВы можете найти бота здесь: @{username}",
         btn_share: "📲 Поделиться",
+        btn_video: "🎬 Видео",
+        btn_audio: "🎧 Аудио (MP3)",
+        btn_music: "🎵 Музыка (Найти и Скачать)",
         btn_audio_version: "🎧 Аудио версия видео",
         btn_find_music: "🔍 Найти музыку"
     },
@@ -212,6 +221,9 @@ const TEXTS = {
         menu_share: "📣 Share Bot",
         share_text: "🚀 **SadoMedia Bot** - Your best assistant for downloading videos from YouTube, Instagram, TikTok and finding music!\n\nYou can find the bot here: @{username}",
         btn_share: "📲 Share",
+        btn_video: "🎬 Video",
+        btn_audio: "🎧 Audio (MP3)",
+        btn_music: "🎵 Music (Find & Download)",
         btn_audio_version: "🎧 Audio version of the video",
         btn_find_music: "🔍 Find music in video"
     }

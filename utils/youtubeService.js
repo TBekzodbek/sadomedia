@@ -127,8 +127,6 @@ async function searchMusic(query, limit = 50) {
     }
 }
 
-
-
 async function getVideoInfo(url) {
     const originalUrl = url;
     url = cleanUrl(url);
@@ -244,13 +242,43 @@ async function getVideoTitle(url) {
     }
 }
 
+/**
+ * Helper to handle the successful download output and find the actual file.
+ */
+async function handleSuccessfulDownload(result, outputPath, type) {
+    const stdout = (typeof result === 'string') ? result : (result.stdout || '');
+    const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
+    const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
+
+    if (destMatches.length > 0) {
+        let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
+        if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
+        if (fs.existsSync(foundPath)) return foundPath;
+    }
+
+    // Manual sweep if stdout parsing fails
+    const base = outputPath.replace('.%(ext)s', '');
+    const extensions = type === 'audio'
+        ? ['.mp3', '.m4a', '.webm', '.aac', '.ogg', '.opus', '.wav']
+        : ['.mp4', '.mkv', '.webm', '.ts', '.mov', '.avi'];
+
+    for (const ext of extensions) {
+        const fb = base + ext;
+        if (fs.existsSync(fb)) return fb;
+    }
+    return null;
+}
+
 async function downloadMedia(url, type, options = {}) {
     const originalUrl = url;
     url = cleanUrl(url);
     console.log(`🚀 [youtubeService] downloadMedia original: [${originalUrl.substring(0, 50)}${originalUrl.length > 50 ? '...' : ''}] -> cleaned: [${url}]`);
-    const { outputPath, height } = options;
 
-    let flags = {
+    const { outputPath, height } = options;
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    const isNumericHeight = /^\d+$/.test(height);
+
+    let baseFlags = {
         output: outputPath,
         noPlaylist: true,
         noWarnings: true,
@@ -263,54 +291,14 @@ async function downloadMedia(url, type, options = {}) {
         geoBypass: true,
         cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
         ffmpegLocation: FFMPEG_LOCATION,
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
     };
 
-    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-
     if (url.includes('instagram.com')) {
-        flags.addHeader = [
-            'Accept-Language: en-US,en;q=0.9',
-            'Sec-Fetch-Mode: navigate',
-            'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
-        ];
-        flags.referer = 'https://www.instagram.com/';
+        baseFlags.referer = 'https://www.instagram.com/';
     } else if (!isYouTube) {
-        flags.referer = url;
+        baseFlags.referer = url;
     }
-
-    if (type === 'audio') {
-        Object.assign(flags, {
-            extractAudio: true,
-            audioFormat: 'mp3',
-            audioQuality: '0',
-            ffmpegLocation: FFMPEG_LOCATION,
-            // Fallback to allow multi-stream if needed
-            format: 'bestaudio/best'
-        });
-        console.log(`🎵 [youtubeService] Audio download flags:`, flags);
-    } else if (type === 'video') {
-        const isNumericHeight = /^\d+$/.test(height);
-        let formatSelect;
-
-        if (isYouTube) {
-            // Priority: MP4 up to target height > Best video+audio up to target height > Any best available
-            // Using bv/ba for shorter strings, ensuring we always have a final 'best' fallback
-            formatSelect = isNumericHeight
-                ? `bv[height<=${height}][ext=mp4]+ba[ext=m4a]/b[height<=${height}][ext=mp4]/bv[height<=${height}]+ba/b[height<=${height}]/best`
-                : 'bv[height<=?720][ext=mp4]+ba[ext=m4a]/b[height<=?720][ext=mp4]/bv[height<=?720]+ba/b[height<=?720]/best';
-        } else {
-            // TikTok/Instagram/Pinterest: Often single-file formats work best
-            formatSelect = 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
-        }
-
-        Object.assign(flags, {
-            format: formatSelect,
-            mergeOutputFormat: 'mp4',
-        });
-    }
-
-    console.log(`🚀 [youtubeService] Final ${type} download flags:`, flags);
 
     const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
     let lastError = null;
@@ -318,106 +306,65 @@ async function downloadMedia(url, type, options = {}) {
     for (const client of clients) {
         try {
             console.log(`📡 [youtubeService] Attempting download with client: ${client}...`);
-            const currentFlags = { ...flags };
+
+            const currentFlags = { ...baseFlags };
             if (isYouTube && client !== 'default') {
                 currentFlags.extractorArgs = `youtube:player_client=${client}`;
             }
 
+            // ATTEMPT 1: Preferred Format
+            if (type === 'audio') {
+                Object.assign(currentFlags, {
+                    extractAudio: true,
+                    audioFormat: 'mp3',
+                    audioQuality: '0',
+                    format: 'bestaudio/best'
+                });
+            } else {
+                currentFlags.format = isYouTube
+                    ? (isNumericHeight ? `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${height}]/best` : 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best')
+                    : 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
+                currentFlags.mergeOutputFormat = 'mp4';
+            }
+
             const downloadOpts = getYtDlpOptions();
-            downloadOpts.timeout = 300000; // 5 minutes for download
+            downloadOpts.timeout = 300000;
 
             try {
+                console.log(`📡 [youtubeService] TRY 1 (${client}) - Format: ${currentFlags.format}`);
                 const result = await youtubedl(url, currentFlags, downloadOpts);
+                const path = await handleSuccessfulDownload(result, outputPath, type);
+                if (path) return path;
+            } catch (err) {
+                console.warn(`⚠️ [youtubeService] TRY 1 failed for ${client}: ${err.message}`);
 
-                // Extract path from stdout if possible
-                const stdout = (typeof result === 'string') ? result : (result.stdout || '');
-                const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
-                const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
-
-                if (destMatches.length > 0) {
-                    let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
-                    if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
-                    if (fs.existsSync(foundPath)) return foundPath;
-                }
-            } catch (innerError) {
-                // Instagram Fallback in download loop
-                if (url.includes('instagram.com') && (innerError.message.includes('login') || innerError.message.includes('rate-limit'))) {
-                    try {
-                        console.log('📡 [youtubeService] Instagram download failed with cookies, retrying without...');
-                        const instaFlags = { ...currentFlags };
-                        delete instaFlags.cookies;
-                        const result = await youtubedl(url, instaFlags, downloadOpts);
-                        const stdout = (typeof result === 'string') ? result : (result.stdout || '');
-                        const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
-                        const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
-                        if (destMatches.length > 0) {
-                            let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
-                            if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
-                            if (fs.existsSync(foundPath)) return foundPath;
-                        }
-                    } catch (instaErr) {
-                        console.warn(`⚠️ [youtubeService] Instagram no-cookies download retry failed: ${instaErr.message}`);
-                    }
+                // ATTEMPT 2: Radical Fallback (best format, no questions asked)
+                console.log(`📡 [youtubeService] TRY 2 (${client}) - Format: best`);
+                const fallbackFlags = { ...currentFlags, format: type === 'audio' ? 'bestaudio/best' : 'best' };
+                // If audio extraction was failing, try downloading without it first
+                if (type === 'audio' && (err.message.includes('format') || err.message.includes('extract'))) {
+                    delete fallbackFlags.extractAudio;
+                    delete fallbackFlags.audioFormat;
                 }
 
-                // If it's an audio extraction error, try a simpler approach without extractAudio if it fails
-                if (type === 'audio' && (innerError.message.includes('ffprobe') || innerError.message.includes('codec'))) {
-                    console.log('⚠️ [youtubeService] Audio extraction failed, trying simple bestaudio download (no conversion)...');
-                    const simpleFlags = { ...currentFlags };
-                    delete simpleFlags.extractAudio;
-                    delete simpleFlags.audioFormat;
-                    delete simpleFlags.audioQuality;
-                    simpleFlags.format = 'bestaudio/best';
-
-                    const result = await youtubedl(url, simpleFlags, downloadOpts);
-                    const stdout = (typeof result === 'string') ? result : (result.stdout || '');
-                    const cleanStdout = stdout.replace(/\x1B\[\d+;?\d*m/g, '');
-                    const destMatches = [...cleanStdout.matchAll(/(?:Destination:|Merging formats into ")(.+?)(?:"|$)/g)];
-                    if (destMatches.length > 0) {
-                        let foundPath = destMatches[destMatches.length - 1][1].trim().replace(/^"/, '').replace(/"$/, '');
-                        if (!path.isAbsolute(foundPath)) foundPath = path.resolve(process.cwd(), foundPath);
-                        if (fs.existsSync(foundPath)) return foundPath;
-                    }
-                } else {
-                    throw innerError;
-                }
-            }
-
-            const base = outputPath.replace('.%(ext)s', '');
-            const extensions = type === 'audio'
-                ? ['.mp3', '.m4a', '.webm', '.aac', '.ogg', '.opus', '.wav']
-                : ['.mp4', '.mkv', '.webm', '.ts', '.mov', '.avi'];
-
-            for (const ext of extensions) {
-                const fallbackPath = base + ext;
-                if (fs.existsSync(fallbackPath)) return fallbackPath;
+                const result2 = await youtubedl(url, fallbackFlags, downloadOpts);
+                const path2 = await handleSuccessfulDownload(result2, outputPath, type);
+                if (path2) return path2;
             }
         } catch (e) {
-            console.warn(`⚠️ [youtubeService] Client ${client} download failed: ${e.message}`);
+            console.warn(`⚠️ [youtubeService] Client ${client} failed: ${e.message}`);
             lastError = e;
         }
     }
 
-    // FINAL FALLBACK: Simplest download
+    // FINAL ULTIMATE FALLBACK: No cookies, simplest format, default client
     try {
-        const fallbackOpts = getYtDlpOptions();
-        fallbackOpts.timeout = 300000;
-        const finalFlags = { ...flags, format: 'best' };
-        if (type === 'audio') {
-            delete finalFlags.extractAudio; // Try without extraction in final fallback
-            delete finalFlags.audioFormat;
-            delete finalFlags.audioQuality;
-            finalFlags.format = 'bestaudio/best';
-        }
-
-        await youtubedl(url, finalFlags, fallbackOpts);
-
-        const base = outputPath.replace('.%(ext)s', '');
-        const exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.aac', '.ogg', '.opus', '.ts'];
-        for (const ext of exts) {
-            const fb = base + ext;
-            if (fs.existsSync(fb)) return fb;
-        }
+        console.log(`📡 [youtubeService] FINAL ATTEMPT - No cookies, format: best`);
+        const finalFlags = { ...baseFlags, format: 'best' };
+        delete finalFlags.cookies;
+        const result3 = await youtubedl(url, finalFlags, getYtDlpOptions());
+        const finalPath = await handleSuccessfulDownload(result3, outputPath, type);
+        if (finalPath) return finalPath;
     } catch (e) {
         lastError = e;
     }
