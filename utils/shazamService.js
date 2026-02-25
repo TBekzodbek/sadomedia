@@ -1,7 +1,8 @@
 const shazamApi = require('shazam-api');
 const ffmpeg = require('ffmpeg-static');
 const { spawn } = require('child_process');
-const stream = require('stream');
+const fs = require('fs-extra');
+const path = require('path');
 
 /**
  * Recognize audio buffer using Shazam API.
@@ -57,18 +58,20 @@ async function recognizeAudio(buffer) {
         const recogPromise = shazam.recognizeSong(pcmBuffer);
         const recog = await Promise.race([recogPromise, timeoutPromise]);
 
-        if (recog && (recog.title || recog.track)) {
-            const trackData = recog.track || recog;
+        if (recog) {
+            console.log('✅ Shazam response received:', JSON.stringify(recog).substring(0, 200));
+            const trackData = recog.track || (recog.matches && recog.matches.length > 0 ? recog : null);
 
-            // Extract lyrics if available
-            if (trackData.sections) {
-                const lyricsSection = trackData.sections.find(s => s.type === 'LYRICS');
-                if (lyricsSection && lyricsSection.text) {
-                    trackData.lyrics = lyricsSection.text.join('\n');
+            if (trackData && (trackData.title || trackData.key)) {
+                // Extract lyrics if available
+                if (trackData.sections) {
+                    const lyricsSection = trackData.sections.find(s => s.type === 'LYRICS');
+                    if (lyricsSection && lyricsSection.text) {
+                        trackData.lyrics = lyricsSection.text.join('\n');
+                    }
                 }
+                return trackData;
             }
-
-            return trackData;
         }
         return null;
     } catch (e) {

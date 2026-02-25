@@ -856,10 +856,18 @@ function startBot() {
                 bot.sendChatAction(chatId, 'record_voice');
 
                 try {
-                    const buffer = await downloadSnippet(reqData.url, 15);
-                    if (!buffer) throw new Error('Could not extract audio');
+                    // Try different time offsets for better recognition
+                    const offsets = [10, 45, 90];
+                    let track = null;
 
-                    const track = await recognizeAudio(buffer);
+                    for (const offset of offsets) {
+                        console.log(`🔍 Attempting recognition at ${offset}s...`);
+                        const buffer = await downloadSnippet(reqData.url, 15, offset);
+                        if (!buffer) continue;
+
+                        track = await recognizeAudio(buffer);
+                        if (track) break; // Found it!
+                    }
 
                     if (track) {
                         const { title, artist, album, year, lyrics } = track;
@@ -873,7 +881,6 @@ function startBot() {
                         }).catch(() => { });
 
                         try {
-                            // Automatic Search & Download
                             const searchResult = await searchMusic(queryStr, 1);
                             const entries = searchResult.entries || (Array.isArray(searchResult) ? searchResult : [searchResult]);
 
@@ -881,7 +888,7 @@ function startBot() {
                                 const foundUrl = `https://www.youtube.com/watch?v=${entries[0].id}`;
                                 const options = {
                                     outputPath: path.join(DOWNLOADS_DIR, `${cleanFilename(queryStr)}_${Date.now()}.%(ext)s`),
-                                    audioQuality: '0' // Best quality
+                                    audioQuality: '0'
                                 };
 
                                 if (lyrics) setLyrics(chatId, lyrics);
@@ -890,7 +897,7 @@ function startBot() {
                                 try {
                                     await handleDownload(chatId, foundUrl, 'audio', options, queryStr);
                                     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
-                                    return; // Success
+                                    return;
                                 } finally {
                                     stopAction();
                                 }
@@ -900,8 +907,8 @@ function startBot() {
                         }
                     }
 
-                    // Fallback: If not found, search failed, or download failed, download original audio
-                    await bot.editMessageText(`⚠️ Musiqani aniqlab bo'lmadi yoki topilmadi. Oddiy audio yuklanmoqda...`, {
+                    // Fallback to original audio if all recognition efforts failed
+                    await bot.editMessageText(`⚠️ Musiqani aniqlab bo'lmadi. Oddiy audio yuklanmoqda...`, {
                         chat_id: chatId,
                         message_id: statusMsg.message_id
                     }).catch(() => { });

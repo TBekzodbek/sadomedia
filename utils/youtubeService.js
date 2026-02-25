@@ -385,7 +385,7 @@ async function downloadMedia(url, type, options = {}) {
     throw new Error(lastError ? lastError.message : 'Download failed completely.');
 }
 
-async function downloadSnippet(url, duration = 15) {
+async function downloadSnippet(url, duration = 15, startTime = 10) {
     url = cleanUrl(url);
     const tempDir = path.join(__dirname, '../downloads');
     await fs.ensureDir(tempDir);
@@ -396,7 +396,6 @@ async function downloadSnippet(url, duration = 15) {
             extractAudio: true,
             audioFormat: 'mp3',
             noPlaylist: true,
-            postprocessorArgs: `ffmpeg:-t ${duration}`,
             output: snippetPath,
             forceIpv4: true,
             noCheckCertificates: true,
@@ -406,7 +405,12 @@ async function downloadSnippet(url, duration = 15) {
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
         };
 
-        if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+            // Speed optimization for YouTube
+            flags.downloadSections = `*${startTime}-${startTime + duration}`;
+        } else {
+            // Fallback for other platforms
+            flags.postprocessorArgs = `ffmpeg:-ss ${startTime} -t ${duration}`;
             flags.referer = url;
         }
 
