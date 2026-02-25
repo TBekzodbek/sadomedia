@@ -136,7 +136,7 @@ async function getVideoInfo(url) {
     if (cached) return cached;
 
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-    const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
+    const clients = isYouTube ? ['ios', 'tv', 'mweb', 'android', 'web'] : ['default'];
 
     for (const client of clients) {
         try {
@@ -156,7 +156,12 @@ async function getVideoInfo(url) {
             if (isYouTube) {
                 if (client !== 'default') {
                     flags.extractorArgs = `youtube:player_client=${client}`;
+                    // Special bypass for TV client which is often less restricted
+                    if (client === 'tv') flags.extractorArgs += ',html5';
                 }
+                // Skip manifest checks for faster/steadier info fetching
+                flags.youtubeSkipDashManifest = true;
+                flags.youtubeSkipHlsManifest = true;
             } else if (url.includes('instagram.com')) {
                 flags.addHeader = [
                     'Accept-Language: en-US,en;q=0.9',
@@ -303,7 +308,7 @@ async function downloadMedia(url, type, options = {}) {
         baseFlags.referer = url;
     }
 
-    const clients = isYouTube ? ['ios', 'android', 'web'] : ['default'];
+    const clients = isYouTube ? ['ios', 'tv', 'mweb', 'android', 'web'] : ['default'];
     let lastError = null;
 
     for (const client of clients) {
@@ -313,6 +318,11 @@ async function downloadMedia(url, type, options = {}) {
             const currentFlags = { ...baseFlags };
             if (isYouTube && client !== 'default') {
                 currentFlags.extractorArgs = `youtube:player_client=${client}`;
+                if (client === 'tv') currentFlags.extractorArgs += ',html5';
+
+                // Keep flags consistent with info fetching to maintain bypass state
+                currentFlags.youtubeSkipDashManifest = true;
+                currentFlags.youtubeSkipHlsManifest = true;
             }
 
             // ATTEMPT 1: Preferred Format
