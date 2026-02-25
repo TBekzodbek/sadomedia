@@ -587,40 +587,20 @@ function startBot() {
 
             setRequest(chatId, { url, title: title, type: 'video' });
 
-            const menu = {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: getText(lang, 'btn_video'), callback_data: 'target_video' }, { text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
-                        [{ text: getText(lang, 'btn_music'), callback_data: 'target_music' }]
-                    ]
-                }
+            // Directly initiate video download
+            const options = {
+                outputPath: path.join(DOWNLOADS_DIR, `${safeTitle}_${Date.now()}.%(ext)s`),
+                height: '720' // Preferred height
             };
 
-            await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
-
-            const esc = (text) => (text || '').replace(/[_*`[\]()]/g, '\\$&');
-            const caption = `📌 **${esc(title)}**\n\n${getText(lang, 'select_quality')}`;
-
-            if (info.thumbnail) {
-                try {
-                    await bot.sendPhoto(chatId, info.thumbnail, {
-                        caption: caption,
-                        parse_mode: 'Markdown',
-                        ...menu
-                    });
-                } catch (photoErr) {
-                    console.warn('⚠️ sendPhoto failed, falling back to sendMessage:', photoErr.message);
-                    await bot.sendMessage(chatId, caption, {
-                        parse_mode: 'Markdown',
-                        ...menu
-                    });
-                }
-            } else {
-                await bot.sendMessage(chatId, caption, {
-                    parse_mode: 'Markdown',
-                    ...menu
-                });
+            const stopAction = sendActionLoop(chatId, 'upload_video');
+            try {
+                await handleDownload(chatId, url, 'video', options, title);
+            } finally {
+                stopAction();
             }
+
+            await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
 
         } catch (error) {
             console.error('processUrl Error:', error);
@@ -1123,8 +1103,8 @@ function startBot() {
             if (type === 'video' && (!mediaOptions.reply_markup || !mediaOptions.reply_markup.inline_keyboard)) {
                 mediaOptions.reply_markup = {
                     inline_keyboard: [
-                        [{ text: getText(lang, 'btn_audio_version'), callback_data: 'target_mp3' }],
-                        [{ text: getText(lang, 'btn_find_music'), callback_data: 'recognize_video' }]
+                        [{ text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
+                        [{ text: getText(lang, 'btn_music'), callback_data: 'target_music' }]
                     ]
                 };
             }
