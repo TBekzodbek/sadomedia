@@ -3,6 +3,9 @@ const path = require('path');
 const NodeCache = require('node-cache');
 const fs = require('fs-extra');
 const axios = require('axios');
+const ffmpeg = require('ffmpeg-static');
+const ffmpegPath = require('ffmpeg-static');
+const ffmpegDir = path.dirname(ffmpegPath);
 
 // Initialize Cache (TTL: 1 hour for search/info, 10 mins for titles)
 const cache = new NodeCache({ stdTTL: 3600 });
@@ -32,9 +35,10 @@ function getYtDlpOptions() {
     const separator = isWin ? ';' : ':';
 
     if (env[pathKey]) {
-        env[pathKey] = `${FFMPEG_LOCATION}${separator}${env[pathKey]}`;
+        // Prepend ffmpeg-static directory and our local bin
+        env[pathKey] = `${ffmpegDir}${separator}${FFMPEG_LOCATION}${separator}${env[pathKey]}`;
     } else {
-        env[pathKey] = FFMPEG_LOCATION;
+        env[pathKey] = `${ffmpegDir}${separator}${FFMPEG_LOCATION}`;
     }
 
     const opts = {
@@ -415,7 +419,9 @@ async function downloadSnippet(url, duration = 15, startTime = 10) {
             flags.format = 'bestaudio/best';
         }
 
-        console.log(`📡 [youtubeService] Downloading snippet: ${startTime}s - ${startTime + duration}s`);
+        flags.jsRuntimes = 'node';
+
+        console.log(`📡 [youtubeService] Downloading snippet: ${startTime}s - ${startTime + duration}s via ${url}`);
         await youtubedl(url, flags, getYtDlpOptions());
 
         if (await fs.pathExists(snippetPath)) {

@@ -13,9 +13,9 @@ async function recognizeAudio(buffer) {
     let pcmBuffer = null;
     try {
         const binFfmpeg = path.join(__dirname, '../bin/ffmpeg.exe');
-        const ffmpegExecutable = fs.existsSync(binFfmpeg) ? binFfmpeg : ffmpeg;
+        const ffmpegExecutable = (process.platform === 'win32' && fs.existsSync(binFfmpeg)) ? binFfmpeg : ffmpeg;
 
-        console.log(`🎼 Converting audio for Shazam using: ${ffmpegExecutable === binFfmpeg ? 'bin/ffmpeg' : 'ffmpeg-static'}`);
+        console.log(`🎼 Converting audio for Shazam using: ${ffmpegExecutable === binFfmpeg ? 'bin/ffmpeg.exe' : 'ffmpeg-static'}`);
 
         // 1. Convert any input audio to Raw PCM s16le, 16000Hz, Mono
         pcmBuffer = await new Promise((resolve, reject) => {
