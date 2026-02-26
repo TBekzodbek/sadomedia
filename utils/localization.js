@@ -1,6 +1,6 @@
 const TEXTS = {
     uz: {
-        welcome: "🌟 **Assalomu alaykum! SadoMedia Bot ga xush kelibsiz!**\n\n🤖 **Men orqali siz quyidagi ijtimoiy tarmoqlardan video yuklashingiz mumkin:**\n• YouTube, Instagram, TikTok 📥\n\n• Musiqa topishingiz 🎵\n\n👇 **Foydalanish uchun:**\n\n1. 🎵 **Musiqa:** Ijrochi yoki qo'shiq nomini yuboring.\n2. 📹 **Media:** Havolani (link) yuboring.",
+        welcome: "🌟 **Assalomu alaykum! SadoMedia Bot ga xush kelibsiz!**\n\n🤖 **Men orqali siz quyidagi ijtimoiy tarmoqlardan video yuklashingiz mumkin:**\n• YouTube, Instagram, TikTok 📥\n\n• Musiqa qidirish va yuklab olish 🎵\n• Audio orqali musiqa topish 🎙\n\n👇 **Foydalanish uchun:**\n\n1. 🎵 **Musiqa qidirish:** Ijrochi yoki qo'shiq nomini yuboring.\n2. 🎙 **Audio orqali musiqa topish:** Ovozli xabar yoki audio fayl yuboring.\n3. 📹 **Media:** Havolani (link) yuboring.",
         main_menu: "Asosiy menyu",
         menu_music: "🎵 Musiqa qidirish",
         menu_video: "🎬 Video yuklash",
@@ -34,7 +34,7 @@ const TEXTS = {
         shazam_not_found: "❌ Kechirasiz, bu musiqani aniqlay olmadim.",
 
         // Dynamic Content
-        help_text: "🤖 @SadoMedia_bot\n\n1. 🎵 **Musiqa:** Ijrochi yoki qo'shiq nomini yuboring.\n2. 🎬 **Media:** Havolani (link) yuboring (YouTube, Instagram, TikTok).",
+        help_text: "🤖 @SadoMedia_bot\n\n1. 🎵 **Musiqa qidirish:** Ijrochi yoki qo'shiq nomini yuboring.\n2. 🎙 **Audio orqali musiqa topish:** Ovozli xabar yoki audio fayl yuboring.\n3. 🎬 **Media:** Havolani (link) yuboring (YouTube, Instagram, TikTok).",
         label_artist: "🎤 Ijrochi",
         label_title: "🎵 Nomi",
         label_album: "💿 Albom",
@@ -56,10 +56,10 @@ const TEXTS = {
         btn_audio: "🎧 Audio (MP3)",
         btn_music: "🎵 Musiqa qidirish",
         btn_audio_version: "🎧 Audio talqini",
-        btn_find_music: "🔍 Musiqasini topish"
+        btn_find_music: "🔍 Musiqa topish"
     },
     uz_cyrl: {
-        welcome: "🌟 **Ассалому алайкум! SadoMedia Bot га хуш келибсиз!**\n\n🤖 **Мен орқали сиз қуйидаги ижтимоий тармоқлардан видео юклашингиз мумкин:**\n• YouTube, Instagram, TikTok 📥\n\n• Мусиқа топишингиз 🎵\n\n👇 **Фойдаланиш учун:**\n\n1. 🎵 **Мусиқа:** Ижрочи ёки қўшиқ номи юборинг.\n2. 📹 **Медиа:** Ҳаволани (link) юборинг.",
+        welcome: "🌟 **Ассалому алайкум! SadoMedia Bot га хуш келибсиз!**\n\n🤖 **Мени орқали сиз қуйидаги ижтимоий тармоқлардан видео юклашингиз мумкин:**\n• YouTube, Instagram, TikTok 📥\n\n• Мусиқа қидириш ва юклаб олиш 🎵\n• Аудио орқали мусиқа топиш 🎙\n\n👇 **Фойдаланиш учун:**\n\n1. 🎵 **Мусиқа қидириш:** Ижрочи ёки қўшиқ номи юборинг.\n2. 🎙 **Аудио орқали мусиқа топиш:** Овозли хабар ёки аудио файл юборинг.\n3. 📹 **Медиа:** Ҳаволани (link) юборинг.",
         main_menu: "Асосий меню",
         menu_music: "🎵 Мусиқа қидириш",
         menu_video: "🎬 Видео юклаш",
@@ -94,7 +94,7 @@ const TEXTS = {
         shazam_not_found: "❌ Кечирасиз, бу мусиқани аниқлай олмадим.",
 
         // Dynamic Content
-        help_text: "🤖 @SadoMedia_bot\n\n1. 🎵 **Мусиқа:** Ижрочи ёки қўшиқ номини юборинг.\n2. 🎬 **Медиа:** Ҳаволани (link) юборинг (YouTube, Instagram, TikTok).",
+        help_text: "🤖 @SadoMedia_bot\n\n1. 🎵 **Мусиқа қидириш:** Ижрочи ёки қўшиқ номини юборинг.\n2. 🎙 **Аудио орқали мусиқа топиш:** Овозли хабар ёки аудио файл юборинг.\n3. 🎬 **Медиа:** Ҳаволани (link) юборинг (YouTube, Instagram, TikTok).",
         label_artist: "🎤 Ижрочи",
         label_title: "🎵 Номи",
         label_album: "💿 Альбом",
@@ -116,10 +116,10 @@ const TEXTS = {
         btn_audio: "🎧 Аудио (MP3)",
         btn_music: "🎵 Мусиқа қидириш",
         btn_audio_version: "🎧 Аудио талқини",
-        btn_find_music: "🔍 Мусиқасини топиш"
+        btn_find_music: "🔍 Мусиқа топиш"
     },
     ru: {
-        welcome: "🌟 **Привет! Добро пожаловать в SadoMedia Bot!**\n\n🤖 **Я могу скачивать видео из следующих соцсетей:**\n• YouTube, Instagram, TikTok 📥\n\n• Находить музыку 🎵\n\n👇 **Как пользоваться:**\n\n1. 🎵 **Музыка:** Отправьте имя исполнителя или название песни.\n2. 📹 **Медиа:** Отправьте ссылку (link).",
+        welcome: "🌟 **Привет! Добро пожаловать в SadoMedia Bot!**\n\n🤖 **Я могу скачивать видео из следующих соцсетей:**\n• YouTube, Instagram, TikTok 📥\n\n• Поиск и скачивание музыки 🎵\n• Найти музыку по аудио 🎙\n\n👇 **Как пользоваться:**\n\n1. 🎵 **Поиск музыки:** Отправьте имя исполнителя или название песни.\n2. 🎙 **Найти музыку по аудио:** Отправьте голосовое сообщение или аудиофайл.\n3. 📹 **Медиа:** Отправьте ссылку (link).",
         main_menu: "Главное меню",
         menu_music: "🎵 Поиск музыки",
         menu_video: "🎬 Скачать видео",
@@ -154,7 +154,7 @@ const TEXTS = {
         shazam_not_found: "❌ Извините, не удалось распознать эту музыку.",
 
         // Dynamic Content
-        help_text: "🤖 @SadoMedia_bot\n\n1. 🎵 **Музыка:** Отправьте имя исполнителя или название песни.\n2. 🎬 **Медиа:** Отправьте ссылку (YouTube, Instagram, TikTok).",
+        help_text: "🤖 @SadoMedia_bot\n\n1. 🎵 **Поиск музыки:** Отправьте имя исполнителя или название песни.\n2. 🎙 **Найти музыку по аудио:** Отправьте голосовое сообщение или аудиофайл.\n3. 🎬 **Медиа:** Отправьте ссылку (YouTube, Instagram, TikTok).",
         label_artist: "🎤 Исполнитель",
         label_title: "🎵 Название",
         label_album: "💿 Альбом",
@@ -179,7 +179,7 @@ const TEXTS = {
         btn_find_music: "🔍 Найти музыку"
     },
     en: {
-        welcome: "🌟 **Hello! Welcome to SadoMedia Bot!**\n\n🤖 **I can download videos from:**\n• YouTube, Instagram, TikTok 📥\n\n• Find music 🎵\n\n👇 **How to use:**\n\n1. 🎵 **Music:** Send Artist/Song name.\n2. 📹 **Media:** Send link.",
+        welcome: "🌟 **Hello! Welcome to SadoMedia Bot!**\n\n🤖 **I can download videos from:**\n• YouTube, Instagram, TikTok 📥\n\n• Search and download music 🎵\n• Find music by audio 🎙\n\n👇 **How to use:**\n\n1. 🎵 **Search Music:** Send Artist/Song name.\n2. 🎙 **Find Music by Audio:** Send a voice message or audio file.\n3. 📹 **Media:** Send link.",
         main_menu: "Main Menu",
         menu_music: "🎵 Search Music",
         menu_video: "🎬 Download Video",
@@ -214,7 +214,7 @@ const TEXTS = {
         shazam_not_found: "❌ Sorry, could not identify this music.",
 
         // Dynamic Content
-        help_text: "🤖 @SadoMedia_bot\n\n1. 🎵 **Music:** Send Artist/Song name.\n2. 🎬 **Media:** Send link (YouTube, Instagram, TikTok).",
+        help_text: "🤖 @SadoMedia_bot\n\n1. 🎵 **Search Music:** Send Artist/Song name.\n2. 🎙 **Find Music by Audio:** Send a voice message or audio file.\n3. 🎬 **Media:** Send link (YouTube, Instagram, TikTok).",
         label_artist: "🎤 Artist",
         label_title: "🎵 Title",
         label_album: "💿 Album",
@@ -236,7 +236,7 @@ const TEXTS = {
         btn_audio: "🎧 Audio (MP3)",
         btn_music: "🎵 Search Music",
         btn_audio_version: "🎧 Audio version of the video",
-        btn_find_music: "🔍 Find music in video"
+        btn_find_music: "🔍 Find music"
     }
 };
 

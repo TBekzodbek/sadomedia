@@ -591,23 +591,32 @@ function startBot() {
             }
 
             const title = info.title || 'Media';
+            const safeTitle = cleanFilename(title);
+
             setRequest(chatId, { url, title: title, type: 'video' });
 
             const options = {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: getText(lang, 'btn_video'), callback_data: 'target_video' }],
-                        [{ text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
-                        [{ text: getText(lang, 'btn_music'), callback_data: 'target_music' }]
-                    ]
-                }
+                outputPath: path.join(DOWNLOADS_DIR, `${safeTitle}_${Date.now()}.%(ext)s`),
+                height: '720' // Preferred height
             };
 
+            const stopAction = sendActionLoop(chatId, 'upload_video');
+            try {
+                // Pass mediaOptions so they appear under the video
+                const mediaOptions = {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
+                            [{ text: getText(lang, 'btn_find_music'), callback_data: 'target_music' }]
+                        ]
+                    }
+                };
+                await handleDownload(chatId, url, 'video', options, title, null, mediaOptions);
+            } finally {
+                stopAction();
+            }
+
             await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
-            debugSend(chatId, `🎬 **${title}**\n\n${getText(lang, 'select_format')}`, {
-                parse_mode: 'Markdown',
-                ...options
-            });
             return;
 
         } catch (error) {
@@ -850,11 +859,16 @@ function startBot() {
 
             // --- RECOGNIZE VIDEO MUSIC (Find & Download) ---
             if (data === 'recognize_video' || data === 'target_music') {
+                console.log(`🔍 [callback] target_music triggered for chatId: ${chatId}`);
                 const reqData = getRequest(chatId);
+
                 if (!reqData || !reqData.url) {
-                    bot.sendMessage(chatId, getText(lang, 'session_expired'));
+                    console.warn(`⚠️ [callback] target_music failed: No reqData for chatId: ${chatId}`);
+                    bot.answerCallbackQuery(query.id, { text: getText(lang, 'session_expired'), show_alert: true });
                     return;
                 }
+
+                bot.answerCallbackQuery(query.id, { text: getText(lang, 'searching') });
 
                 if (data === 'target_music') {
                     bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
@@ -1119,7 +1133,7 @@ function startBot() {
                 mediaOptions.reply_markup = {
                     inline_keyboard: [
                         [{ text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
-                        [{ text: getText(lang, 'btn_music'), callback_data: 'target_music' }]
+                        [{ text: getText(lang, 'btn_find_music'), callback_data: 'target_music' }]
                     ]
                 };
             }
