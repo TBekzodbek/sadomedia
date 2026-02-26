@@ -6,7 +6,8 @@
     "scripts": {
         "start": "node index.js",
         "test": "jest",
-        "postinstall": "node scripts/setup_bin.js"
+        "postinstall": "node scripts/setup_bin.js",
+        "push": "git add . && git commit -m \"🚀 Update\" && git push origin main"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.95.3",
