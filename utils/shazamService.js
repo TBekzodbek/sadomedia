@@ -12,13 +12,15 @@ const path = require('path');
 async function recognizeAudio(buffer) {
     let pcmBuffer = null;
     try {
-        console.log('🎼 Starting audio conversion for Shazam...');
+        const binFfmpeg = path.join(__dirname, '../bin/ffmpeg.exe');
+        const ffmpegExecutable = fs.existsSync(binFfmpeg) ? binFfmpeg : ffmpeg;
+
+        console.log(`🎼 Converting audio for Shazam using: ${ffmpegExecutable === binFfmpeg ? 'bin/ffmpeg' : 'ffmpeg-static'}`);
 
         // 1. Convert any input audio to Raw PCM s16le, 16000Hz, Mono
-        // This is strictly required by the shazam-api package.
         pcmBuffer = await new Promise((resolve, reject) => {
             const chunks = [];
-            const ffmpegProcess = spawn(ffmpeg, [
+            const ffmpegProcess = spawn(ffmpegExecutable, [
                 '-i', 'pipe:0',      // Input from stdin
                 '-f', 's16le',       // Output format raw PCM 16-bit LE
                 '-acodec', 'pcm_s16le',
@@ -30,13 +32,17 @@ async function recognizeAudio(buffer) {
 
             ffmpegProcess.stdout.on('data', (chunk) => chunks.push(chunk));
             ffmpegProcess.stderr.on('data', (data) => {
-                // Ignore ffmpeg banners/info, but log errors
-                if (data.toString().includes('Error')) console.error(`FFMPEG: ${data}`);
+                // Log only real errors
+                if (data.toString().toLowerCase().includes('error')) console.warn(`FFMPEG: ${data}`);
             });
 
             ffmpegProcess.on('close', (code) => {
                 if (code === 0) resolve(Buffer.concat(chunks));
                 else reject(new Error(`FFmpeg exited with code ${code}`));
+            });
+
+            ffmpegProcess.stdin.on('error', (err) => {
+                console.warn('FFMPEG Stdin error (ignoring):', err.message);
             });
 
             ffmpegProcess.stdin.write(buffer);
@@ -47,31 +53,50 @@ async function recognizeAudio(buffer) {
             throw new Error('Failed to generate PCM buffer');
         }
 
+        // 2. Convert Buffer to Int16Array (s16le) for shazam-api
+        const samples = new Int16Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.length / 2);
+
         const shazam = new shazamApi.Shazam();
 
-        // 2. Increase timeout to 30 seconds for upload and recognition
+        // 3. Timeout for shazam recognition
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Shazam Timeout')), 30000)
+            setTimeout(() => reject(new Error('Shazam Timeout')), 35000)
         );
 
-        console.log('🚀 Sending PCM to Shazam API...');
-        const recogPromise = shazam.recognizeSong(pcmBuffer);
+        console.log(`🚀 Sending ${samples.length} samples to Shazam API...`);
+        const recogPromise = shazam.fullRecognizeSong(samples);
         const recog = await Promise.race([recogPromise, timeoutPromise]);
 
-        if (recog) {
-            console.log('✅ Shazam response received:', JSON.stringify(recog).substring(0, 200));
-            const trackData = recog.track || (recog.matches && recog.matches.length > 0 ? recog : null);
+        if (recog && recog.track) {
+            console.log('✅ Shazam response received:', JSON.stringify(recog.track).substring(0, 100));
+            const track = recog.track;
 
-            if (trackData && (trackData.title || trackData.key)) {
-                // Extract lyrics if available
-                if (trackData.sections) {
-                    const lyricsSection = trackData.sections.find(s => s.type === 'LYRICS');
-                    if (lyricsSection && lyricsSection.text) {
-                        trackData.lyrics = lyricsSection.text.join('\n');
-                    }
-                }
-                return trackData;
+            // Extract album and year from sections metadata
+            let album = null;
+            let year = null;
+            const songSection = track.sections?.find(s => s.type === 'SONG');
+            if (songSection && songSection.metadata) {
+                album = songSection.metadata.find(m => m.title === 'Album')?.text;
+                year = songSection.metadata.find(m => m.title === 'Released')?.text;
             }
+
+            // Extract lyrics
+            let lyrics = null;
+            const lyricsSection = track.sections?.find(s => s.type === 'LYRICS');
+            if (lyricsSection && lyricsSection.text) {
+                lyrics = lyricsSection.text.join('\n');
+            }
+
+            return {
+                title: track.title,
+                artist: track.subtitle,
+                subtitle: track.subtitle,
+                album: album,
+                year: year,
+                lyrics: lyrics,
+                url: track.url,
+                track: track // keep the whole thing just in case
+            };
         }
         return null;
     } catch (e) {
@@ -83,3 +108,4 @@ async function recognizeAudio(buffer) {
 module.exports = {
     recognizeAudio
 };
+

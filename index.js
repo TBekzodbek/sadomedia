@@ -60,6 +60,7 @@ const STATES = {
     WAITING_MUSIC: 'WAITING_MUSIC',
     WAITING_VIDEO: 'WAITING_VIDEO',
     WAITING_AUDIO: 'WAITING_AUDIO',
+    WAITING_SHAZAM: 'WAITING_SHAZAM',
     WAITING_BROADCAST: 'WAITING_BROADCAST',
     WAITING_BROADCAST_CONFIRM: 'WAITING_BROADCAST_CONFIRM'
 };
@@ -223,6 +224,7 @@ function startBot() {
     const getMainMenu = (lang) => {
         const keyboard = [];
         keyboard.push([{ text: getText(lang, 'menu_music') }, { text: getText(lang, 'menu_video') }]);
+        keyboard.push([{ text: getText(lang, 'menu_shazam') }]);
         keyboard.push([{ text: getText(lang, 'menu_help') }, { text: getText(lang, 'menu_share') }]);
 
         return {
@@ -359,7 +361,7 @@ function startBot() {
             }
 
             // Check if it's any of the main menu buttons to allow switching modes
-            const menuKeys = ['menu_music', 'menu_video', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
+            const menuKeys = ['menu_music', 'menu_video', 'menu_shazam', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
             let matchedMenu = false;
             for (const key of menuKeys) {
                 if (isCommand(text, key)) {
@@ -415,6 +417,12 @@ function startBot() {
             if (isCommand(text, 'menu_video')) {
                 await setUserState(chatId, STATES.WAITING_VIDEO);
                 bot.sendMessage(chatId, getText(lang, 'prompt_video'), getBackMenu(lang));
+                return;
+            }
+
+            if (isCommand(text, 'menu_shazam')) {
+                await setUserState(chatId, STATES.WAITING_SHAZAM);
+                bot.sendMessage(chatId, getText(lang, 'prompt_shazam'), getBackMenu(lang));
                 return;
             }
 
@@ -583,24 +591,24 @@ function startBot() {
             }
 
             const title = info.title || 'Media';
-            const safeTitle = cleanFilename(title);
-
             setRequest(chatId, { url, title: title, type: 'video' });
 
-            // Directly initiate video download
             const options = {
-                outputPath: path.join(DOWNLOADS_DIR, `${safeTitle}_${Date.now()}.%(ext)s`),
-                height: '720' // Preferred height
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: getText(lang, 'btn_video'), callback_data: 'target_video' }],
+                        [{ text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
+                        [{ text: getText(lang, 'btn_music'), callback_data: 'target_music' }]
+                    ]
+                }
             };
 
-            const stopAction = sendActionLoop(chatId, 'upload_video');
-            try {
-                await handleDownload(chatId, url, 'video', options, title);
-            } finally {
-                stopAction();
-            }
-
             await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+            debugSend(chatId, `🎬 **${title}**\n\n${getText(lang, 'select_format')}`, {
+                parse_mode: 'Markdown',
+                ...options
+            });
+            return;
 
         } catch (error) {
             console.error('processUrl Error:', error);
