@@ -159,9 +159,7 @@ async function getVideoInfo(url) {
                     // Special bypass for TV client which is often less restricted
                     if (client === 'tv') flags.extractorArgs += ',html5';
                 }
-                // Skip manifest checks for faster/steadier info fetching
-                flags.youtubeSkipDashManifest = true;
-                flags.youtubeSkipHlsManifest = true;
+                // Skip manifest checks for faster/steadier info fetching (Removed deprecated flags)
             } else if (url.includes('instagram.com')) {
                 flags.addHeader = [
                     'Accept-Language: en-US,en;q=0.9',
@@ -320,9 +318,7 @@ async function downloadMedia(url, type, options = {}) {
                 currentFlags.extractorArgs = `youtube:player_client=${client}`;
                 if (client === 'tv') currentFlags.extractorArgs += ',html5';
 
-                // Keep flags consistent with info fetching to maintain bypass state
-                currentFlags.youtubeSkipDashManifest = true;
-                currentFlags.youtubeSkipHlsManifest = true;
+                // Skip manifest checks for faster/steadier info fetching (Removed deprecated flags)
             }
 
             // ATTEMPT 1: Preferred Format
@@ -335,8 +331,10 @@ async function downloadMedia(url, type, options = {}) {
                 });
             } else {
                 currentFlags.format = isYouTube
-                    ? (isNumericHeight ? `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${height}]/best` : 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best')
-                    : 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
+                    ? (isNumericHeight
+                        ? `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best[height<=${height}]/best`
+                        : 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best')
+                    : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best';
                 currentFlags.mergeOutputFormat = 'mp4';
             }
 
