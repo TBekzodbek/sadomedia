@@ -136,8 +136,10 @@ async function getVideoInfo(url) {
     if (cached) return cached;
 
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-    const clients = isYouTube ? ['ios', 'tv', 'mweb', 'android', 'web'] : ['default'];
+    const clients = isYouTube ? ['android', 'ios', 'tv', 'mweb', 'web'] : ['default'];
 
+    // Check if we have a JS runtime (like node or deno) available for yt-dlp
+    const jsRuntime = 'node'; // Default to node since we are in a node environment
     for (const client of clients) {
         try {
             console.log(`🔎 [youtubeService] Fetching metadata via client: ${client}...`);
@@ -150,7 +152,8 @@ async function getVideoInfo(url) {
                 geoBypass: true,
                 cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
                 ffmpegLocation: FFMPEG_LOCATION,
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                jsRuntimes: jsRuntime
             };
 
             if (isYouTube) {
@@ -159,7 +162,6 @@ async function getVideoInfo(url) {
                     // Special bypass for TV client which is often less restricted
                     if (client === 'tv') flags.extractorArgs += ',html5';
                 }
-                // Skip manifest checks for faster/steadier info fetching (Removed deprecated flags)
             } else if (url.includes('instagram.com')) {
                 flags.addHeader = [
                     'Accept-Language: en-US,en;q=0.9',
@@ -175,7 +177,6 @@ async function getVideoInfo(url) {
 
             if (info) {
                 if (!info.thumbnail && info.thumbnails && info.thumbnails.length > 0) {
-                    // Telegram doesn't like .webp via URL in sendPhoto, prefer jpg/png
                     const sorted = info.thumbnails.sort((a, b) => (b.width || 0) - (a.width || 0));
                     const preferred = sorted.find(t => t.url && !t.url.includes('.webp')) || sorted[0];
                     info.thumbnail = preferred.url;
@@ -186,7 +187,6 @@ async function getVideoInfo(url) {
         } catch (e) {
             console.warn(`⚠️ [youtubeService] Metadata fetch failed for ${client}: ${e.message}`);
 
-            // Instagram Fallback: try without cookies if it's a login/rate-limit issue
             if (url.includes('instagram.com') && (e.message.includes('login') || e.message.includes('rate-limit'))) {
                 try {
                     console.log(`🔎 [youtubeService] Retrying Instagram without cookies...`);
@@ -223,7 +223,8 @@ async function getVideoInfo(url) {
             geoBypass: true,
             cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
             ffmpegLocation: FFMPEG_LOCATION,
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            jsRuntimes: jsRuntime
         };
         if (url.includes('instagram.com')) flags.referer = 'https://www.instagram.com/';
 
@@ -319,6 +320,7 @@ async function downloadMedia(url, type, options = {}) {
                 if (client === 'tv') currentFlags.extractorArgs += ',html5';
 
                 // Skip manifest checks for faster/steadier info fetching (Removed deprecated flags)
+                currentFlags.jsRuntimes = 'node';
             }
 
             // ATTEMPT 1: Preferred Format
@@ -400,18 +402,22 @@ async function downloadSnippet(url, duration = 15, startTime = 10) {
             geoBypass: true,
             cookies: fs.existsSync(COOKIES_PATH) ? COOKIES_PATH : undefined,
             ffmpegLocation: FFMPEG_LOCATION,
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            jsRuntimes: 'node'
         };
 
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
             // Speed optimization for YouTube
             flags.downloadSections = `*${startTime}-${startTime + duration}`;
+            flags.format = 'bestaudio/best';
         } else {
             // Fallback for other platforms
             flags.postprocessorArgs = `ffmpeg:-ss ${startTime} -t ${duration}`;
             flags.referer = url;
+            flags.format = 'bestaudio/best';
         }
 
+        console.log(`📡 [youtubeService] Downloading snippet: ${startTime}s - ${startTime + duration}s`);
         await youtubedl(url, flags, getYtDlpOptions());
 
         if (await fs.pathExists(snippetPath)) {
