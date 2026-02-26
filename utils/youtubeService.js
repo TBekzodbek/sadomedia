@@ -393,8 +393,6 @@ async function downloadSnippet(url, duration = 15, startTime = 10) {
 
     try {
         const flags = {
-            extractAudio: true,
-            audioFormat: 'mp3',
             noPlaylist: true,
             output: snippetPath,
             forceIpv4: true,

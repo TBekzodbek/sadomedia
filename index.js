@@ -896,36 +896,52 @@ function startBot() {
                         const queryStr = `${artist} - ${title}`;
                         const esc = (text) => (text || '').replace(/[_*`[\]()]/g, '\\$&');
 
-                        await bot.editMessageText(`🎵 **Topildi:** ${esc(artist)} - ${esc(title)}\n⏳ Yuklanmoqda...`, {
+                        await bot.editMessageText(`🎵 **Topildi:** ${esc(artist)} - ${esc(title)}\n🔍 Natijalar qidirilmoqda...`, {
                             chat_id: chatId,
                             message_id: statusMsg.message_id,
                             parse_mode: 'Markdown'
                         }).catch(() => { });
 
                         try {
-                            const searchResult = await searchMusic(queryStr, 1);
+                            const searchResult = await searchMusic(queryStr, 15);
                             const entries = searchResult.entries || (Array.isArray(searchResult) ? searchResult : [searchResult]);
 
                             if (entries && entries.length > 0) {
-                                const foundUrl = `https://www.youtube.com/watch?v=${entries[0].id}`;
-                                const options = {
-                                    outputPath: path.join(DOWNLOADS_DIR, `${cleanFilename(queryStr)}_${Date.now()}.%(ext)s`),
-                                    audioQuality: '0'
-                                };
-
                                 if (lyrics) setLyrics(chatId, lyrics);
 
-                                const stopAction = sendActionLoop(chatId, 'upload_voice');
-                                try {
-                                    await handleDownload(chatId, foundUrl, 'audio', options, queryStr);
-                                    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
-                                    return;
-                                } finally {
-                                    stopAction();
+                                const searchKeyboard = [];
+                                const pageResults = entries.slice(0, 10);
+
+                                pageResults.forEach((entry, index) => {
+                                    let durationStr = '';
+                                    if (entry.duration) {
+                                        const date = new Date(0);
+                                        date.setSeconds(entry.duration);
+                                        const timeString = date.toISOString().substr(14, 5);
+                                        durationStr = ` (${timeString})`;
+                                    }
+                                    searchKeyboard.push([{ text: `${index + 1}. ${entry.title.substring(0, 50)}${durationStr}`, callback_data: `sel_${entry.id}` }]);
+                                });
+
+                                const controlRow = [{ text: "❌", callback_data: "del_search" }];
+                                if (entries.length > 10) {
+                                    setResults(chatId, { total: entries, page: 1 });
+                                    controlRow.push({ text: "➡️", callback_data: `next_results` });
                                 }
+                                searchKeyboard.push(controlRow);
+
+                                const menu = { reply_markup: { inline_keyboard: searchKeyboard } };
+                                addLyricsBtn(chatId, lang, menu);
+
+                                await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+                                await bot.sendMessage(chatId, `🎶 **${esc(artist)} - ${esc(title)}**\n\nQuyidagi natijalardan birini tanlang:`, {
+                                    parse_mode: 'Markdown',
+                                    ...menu
+                                });
+                                return;
                             }
                         } catch (innerError) {
-                            console.warn(`⚠️ Search/Download for found music failed: ${innerError.message}. Falling back...`);
+                            console.warn(`⚠️ Search for found music failed: ${innerError.message}. Falling back...`);
                         }
                     }
 
