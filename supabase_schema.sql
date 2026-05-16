@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT,
     first_name TEXT,
     last_name TEXT,
+    quota_count INTEGER DEFAULT 0,
+    quota_limit INTEGER DEFAULT 20,
+    last_request_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -11,7 +11,7 @@ const { searchVideo, searchMusic, getVideoInfo, getVideoTitle, downloadMedia, do
 const { recognizeAudio } = require('./utils/shazamService');
 const { getText } = require('./utils/localization');
 const { checkText, checkMetadata, addStrike, isUserBlocked, resetStrikes } = require('./utils/moderation');
-const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser, saveBroadcast, getLastBroadcast, getBroadcastContent, setBroadcastContent, getLyrics, setLyrics } = require('./utils/storage');
+const { getLang, setLang, getState, setState, getRequest, setRequest, getResults, setResults, getAllUsers, getUser, saveBroadcast, getLastBroadcast, getBroadcastContent, setBroadcastContent, getLyrics, setLyrics, getUserQuota, checkAndIncrementQuota } = require('./utils/storage');
 
 // GLOBAL ERROR HANDLERS
 process.on('uncaughtException', (error) => {
@@ -62,7 +62,8 @@ const STATES = {
     WAITING_AUDIO: 'WAITING_AUDIO',
     WAITING_SHAZAM: 'WAITING_SHAZAM',
     WAITING_BROADCAST: 'WAITING_BROADCAST',
-    WAITING_BROADCAST_CONFIRM: 'WAITING_BROADCAST_CONFIRM'
+    WAITING_BROADCAST_CONFIRM: 'WAITING_BROADCAST_CONFIRM',
+    WAITING_DISCOVERY: 'WAITING_DISCOVERY'
 };
 
 // Graceful Shutdown Handler
@@ -221,10 +222,12 @@ function startBot() {
         return bot.sendMessage(chatId, text, options);
     };
 
-    const getMainMenu = (lang) => {
+    const getMainMenu = async (chatId, lang) => {
         const keyboard = [];
+        const quota = await getUserQuota(chatId);
+
         keyboard.push([{ text: getText(lang, 'menu_music') }, { text: getText(lang, 'menu_video') }]);
-        keyboard.push([{ text: getText(lang, 'menu_shazam') }]);
+        keyboard.push([{ text: getText(lang, 'menu_shazam') }, { text: getText(lang, 'menu_discovery') }]);
         keyboard.push([{ text: getText(lang, 'menu_help') }, { text: getText(lang, 'menu_share') }]);
 
         return {
@@ -237,10 +240,12 @@ function startBot() {
 
     const getBackMenu = (lang) => ({
         reply_markup: {
-            keyboard: [[getText(lang, 'menu_back')]],
+            keyboard: [[{ text: getText(lang, 'menu_back') }]],
             resize_keyboard: true
         }
     });
+
+    const getAppFooter = () => "\n\n——————————————\n🤖 **@SadoMedia_bot** — *Premium Quality*";
 
     // Higher-order helper for robust command matching
     const { TEXTS: ALL_TEXTS } = require('./utils/localization');
@@ -257,19 +262,18 @@ function startBot() {
         const chatId = msg.chat.id;
         await setUserState(chatId, STATES.MAIN);
 
-        // Send Welcome Message first
-        debugSend(chatId, "👋 **Welcome to SadoMedia Bot!**\n\n🇺🇿 Xush kelibsiz!\n🇷🇺 Добро пожаловать!", { parse_mode: 'Markdown' })
-            .then(() => {
-                // Offer Language Selection
-                debugSend(chatId, "🇺🇿 Iltimos, tilni tanlang:\n🇺🇿 Илтимос, тилни танланг:\n🇷🇺 Пожалуйста, выберите язык:\n🇬🇧 Please select a language:", {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: "🇺🇿 O'zbekcha", callback_data: 'lang_uz' }, { text: "🇺🇿 Ўзбекча (Кирилл)", callback_data: 'lang_uz_cyrl' }],
-                            [{ text: "🇷🇺 Русский", callback_data: 'lang_ru' }, { text: "🇬🇧 English", callback_data: 'lang_en' }]
-                        ]
-                    }
-                });
-            });
+        // Send Welcome Message with Premium Look
+        const welcomeText = "✨ **PREMIUM SadoMedia Bot** ✨\n\n👋 **Xush kelibsiz! / Добро пожаловать!**\n\nIltimos, o'zingizga qulay tilni tanlang:\nПожалуйста, выберите удобный для вас язык:";
+
+        debugSend(chatId, welcomeText, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "🇺🇿 O'zbekcha", callback_data: 'lang_uz' }, { text: "🇺🇿 Ўзбекча", callback_data: 'lang_uz_cyrl' }],
+                    [{ text: "🇷🇺 Русский", callback_data: 'lang_ru' }, { text: "🇬🇧 English", callback_data: 'lang_en' }]
+                ]
+            }
+        });
     });
 
 
@@ -356,12 +360,12 @@ function startBot() {
                 await setUserState(chatId, STATES.MAIN);
                 setRequest(chatId, null);
                 setBroadcastContent(chatId, null);
-                bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
+                bot.sendMessage(chatId, getText(lang, 'welcome') + getAppFooter(), await getMainMenu(chatId, lang), { parse_mode: 'Markdown' });
                 return;
             }
 
             // Check if it's any of the main menu buttons to allow switching modes
-            const menuKeys = ['menu_music', 'menu_video', 'menu_shazam', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
+            const menuKeys = ['menu_music', 'menu_video', 'menu_shazam', 'menu_discovery', 'menu_audio', 'menu_help', 'menu_lang', 'menu_share'];
             let matchedMenu = false;
             for (const key of menuKeys) {
                 if (isCommand(text, key)) {
@@ -428,8 +432,16 @@ function startBot() {
 
 
 
+            if (isCommand(text, 'menu_discovery')) {
+                const urls = require('./yt_urls.json');
+                const randomUrl = urls[Math.floor(Math.random() * urls.length)];
+                bot.sendMessage(chatId, "🎲 **Tasodifiy video tanlanmoqda...**", { parse_mode: 'Markdown' });
+                await processUrl(chatId, randomUrl, 'video', true); // Pass true for isDiscovery
+                return;
+            }
+
             if (isCommand(text, 'menu_help')) {
-                bot.sendMessage(chatId, getText(lang, 'help_text'), getMainMenu(lang));
+                bot.sendMessage(chatId, getText(lang, 'help_text') + getAppFooter(), { parse_mode: 'Markdown', ...(await getMainMenu(chatId, lang)) });
                 return;
             }
 
@@ -439,7 +451,7 @@ function startBot() {
             if (isCommand(text, 'menu_back')) {
                 await setUserState(chatId, STATES.MAIN);
                 setRequest(chatId, null);
-                bot.sendMessage(chatId, getText(lang, 'welcome'), getMainMenu(lang));
+                bot.sendMessage(chatId, getText(lang, 'welcome') + getAppFooter(), { parse_mode: 'Markdown', ...(await getMainMenu(chatId, lang)) });
                 return;
             }
 
@@ -502,17 +514,24 @@ function startBot() {
 
             debugSend(chatId, getText(lang, 'searching'), { disable_notification: true });
 
+            // Check Quota for Search
+            const quotaStatus = await checkAndIncrementQuota(chatId);
+            if (!quotaStatus.allowed) {
+                bot.sendMessage(chatId, getText(lang, 'quota_exceeded').replace('{limit}', quotaStatus.limit), { parse_mode: 'Markdown' });
+                return;
+            }
+
             // Clear previous lyrics for a new manual search
             setLyrics(chatId, null);
 
             // Non-blocking search
             const searchQuery = `${text} audio`;
 
-            searchMusic(searchQuery, 75).then(output => {
+            searchMusic(searchQuery, 75).then(async output => {
                 const entries = output.entries || (Array.isArray(output) ? output : [output]);
 
                 if (!entries || entries.length === 0) {
-                    bot.sendMessage(chatId, getText(lang, 'not_found'), getMainMenu(lang));
+                    bot.sendMessage(chatId, getText(lang, 'not_found'), await getMainMenu(chatId, lang));
                     return;
                 }
 
@@ -545,9 +564,9 @@ function startBot() {
                     parse_mode: 'Markdown',
                     reply_markup: { inline_keyboard: searchKeyboard }
                 });
-            }).catch(err => {
+            }).catch(async err => {
                 console.error(err);
-                debugSend(chatId, getText(lang, 'error'), getMainMenu(lang));
+                debugSend(chatId, getText(lang, 'error'), await getMainMenu(chatId, lang));
             });
         } catch (error) {
             console.error('⚠️ Global Message Handler Error:', error);
@@ -565,7 +584,7 @@ function startBot() {
         return () => clearInterval(interval);
     };
 
-    async function processUrl(chatId, url, typeContext = 'video') {
+    async function processUrl(chatId, url, typeContext = 'video', isDiscovery = false) {
         const lang = await getLang(chatId);
         const statusMsg = await debugSend(chatId, getText(lang, 'processing'));
 
@@ -579,6 +598,14 @@ function startBot() {
                 debugSend(chatId, getText(lang, 'warning_adult'));
                 debugSend(chatId, getText(lang, 'warning_strike').replace('{count}', strikeData.count));
                 await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+                return;
+            }
+
+            // Check Quota for URL processing
+            const quotaStatus = await checkAndIncrementQuota(chatId);
+            if (!quotaStatus.allowed) {
+                await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => { });
+                bot.sendMessage(chatId, getText(lang, 'quota_exceeded').replace('{limit}', quotaStatus.limit), { parse_mode: 'Markdown' });
                 return;
             }
 
@@ -603,12 +630,18 @@ function startBot() {
             const stopAction = sendActionLoop(chatId, 'upload_video');
             try {
                 // Pass mediaOptions so they appear under the video
+                const keyboard = [
+                    [{ text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
+                    [{ text: getText(lang, 'btn_find_music'), callback_data: 'target_music' }]
+                ];
+
+                if (isDiscovery) {
+                    keyboard.unshift([{ text: "🎲 Next (Tasodifiy)", callback_data: 'next_discovery' }]);
+                }
+
                 const mediaOptions = {
                     reply_markup: {
-                        inline_keyboard: [
-                            [{ text: getText(lang, 'btn_audio'), callback_data: 'target_mp3' }],
-                            [{ text: getText(lang, 'btn_find_music'), callback_data: 'target_music' }]
-                        ]
+                        inline_keyboard: keyboard
                     }
                 };
                 await handleDownload(chatId, url, 'video', options, title, null, mediaOptions);
@@ -669,7 +702,7 @@ function startBot() {
                         await setBroadcastContent(chatId, null);
                         await setUserState(chatId, STATES.MAIN);
                         bot.editMessageText("❌ **Broadcast bekor qilindi.**", { chat_id: chatId, message_id: query.message.message_id });
-                        bot.sendMessage(chatId, getText(lang, 'main_menu'), getMainMenu(lang));
+                        bot.sendMessage(chatId, getText(lang, 'main_menu'), await getMainMenu(chatId, lang));
                         return;
                     }
 
@@ -706,7 +739,7 @@ function startBot() {
                     await saveBroadcast(content.text, broadcastRecipients);
                     await setBroadcastContent(chatId, null);
                     await setUserState(chatId, STATES.MAIN);
-                    bot.sendMessage(chatId, `✅ **Broadcast yakunlandi.**\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`, getMainMenu(lang));
+                    bot.sendMessage(chatId, `✅ **Broadcast yakunlandi.**\n\n🟢 Yuborildi: ${sentCount}\n🔴 Xatolik: ${failCount}`, await getMainMenu(chatId, lang));
 
                 } else if (data === 'admin_recall') {
                     const lastBroadcast = await getLastBroadcast();
@@ -774,13 +807,21 @@ function startBot() {
                 return;
             }
 
+            // --- DISCOVERY CALLBACK ---
+            if (data === 'next_discovery') {
+                const urls = require('./yt_urls.json');
+                const randomUrl = urls[Math.floor(Math.random() * urls.length)];
+                await processUrl(chatId, randomUrl, 'video', true);
+                return;
+            }
+
             // --- LANGUAGE SELECTION ---
             if (data.startsWith('lang_')) {
                 const selectedLang = data.replace('lang_', '');
-                await setLang(chatId, selectedLang);
-                bot.sendMessage(chatId, getText(selectedLang, 'welcome'), {
+                const welcomeMsg = getText(selectedLang, 'welcome') + getAppFooter();
+                bot.sendMessage(chatId, welcomeMsg, {
                     parse_mode: 'Markdown',
-                    ...getMainMenu(selectedLang)
+                    ...(await getMainMenu(chatId, selectedLang))
                 });
                 return;
             }
@@ -1075,7 +1116,7 @@ function startBot() {
             if (data === 'cancel_req') {
                 setRequest(chatId, null);
                 bot.deleteMessage(chatId, query.message.message_id).catch(() => { });
-                debugSend(chatId, getText(lang, 'main_menu'), getMainMenu(lang));
+                debugSend(chatId, getText(lang, 'main_menu'), await getMainMenu(chatId, lang));
                 return;
             }
 
@@ -1083,7 +1124,7 @@ function startBot() {
             if (!reqData) {
                 // If it's a download target but no request data, user probably clicked an old button or bot restarted
                 if (data.startsWith('target_')) {
-                    bot.sendMessage(chatId, `⚠️ **${getText(lang, 'error')}**\n\nSizning yuklash seanshingiz yakunlangan yoki eskirgan. Iltimos, havolani qaytadan yuboring.\nYour session has expired. Please send the link again.`, getMainMenu(lang));
+                    bot.sendMessage(chatId, `⚠️ **${getText(lang, 'error')}**\n\nSizning yuklash seanshingiz yakunlangan yoki eskirgan. Iltimos, havolani qaytadan yuboring.\nYour session has expired. Please send the link again.`, await getMainMenu(chatId, lang));
                 }
                 return;
             }
@@ -1177,7 +1218,10 @@ function startBot() {
 
             addLyricsBtn(chatId, lang, finalMenu);
 
-            debugSend(chatId, getText(lang, 'done'), finalMenu);
+            const quota = await getUserQuota(chatId);
+            const quotaInfo = `\n\n${getText(lang, 'quota_info').replace('{remaining}', quota.remaining).replace('{limit}', quota.limit)}`;
+
+            debugSend(chatId, getText(lang, 'done') + quotaInfo + getAppFooter(), { parse_mode: 'Markdown', ...finalMenu });
 
         } catch (error) {
             console.error('Download Error:', error);

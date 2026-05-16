@@ -182,6 +182,50 @@ async function getLastBroadcast() {
     return null;
 }
 
+async function getUserQuota(chatId) {
+    const user = await getUser(chatId);
+    return {
+        count: user.quota_count || 0,
+        limit: user.quota_limit || 20,
+        remaining: Math.max(0, (user.quota_limit || 20) - (user.quota_count || 0))
+    };
+}
+
+async function checkAndIncrementQuota(chatId) {
+    const user = await getUser(chatId);
+    const now = new Date();
+    const lastRequest = user.last_request_at ? new Date(user.last_request_at) : new Date(0);
+
+    const isNewDay = now.getUTCFullYear() !== lastRequest.getUTCFullYear() ||
+        now.getUTCMonth() !== lastRequest.getUTCMonth() ||
+        now.getUTCDate() !== lastRequest.getUTCDate();
+
+    let newCount = isNewDay ? 0 : (user.quota_count || 0);
+    const limit = user.quota_limit || 20;
+
+    if (newCount >= limit) {
+        return { allowed: false, remaining: 0, limit };
+    }
+
+    newCount += 1;
+
+    const { error } = await supabase
+        .from('users')
+        .update({
+            quota_count: newCount,
+            last_request_at: now,
+            updated_at: now
+        })
+        .eq('chat_id', chatId);
+
+    if (error) {
+        console.error('Supabase updateQuota Error:', error);
+        // If DB fails, we still allow it but log error
+    }
+
+    return { allowed: true, remaining: limit - newCount, limit };
+}
+
 module.exports = {
     getLang,
     setLang,
@@ -198,5 +242,7 @@ module.exports = {
     getBroadcastContent,
     setBroadcastContent,
     getLyrics,
-    setLyrics
+    setLyrics,
+    getUserQuota,
+    checkAndIncrementQuota
 };

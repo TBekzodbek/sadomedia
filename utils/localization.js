@@ -56,7 +56,10 @@ const TEXTS = {
         btn_audio: "🎧 Audio (MP3)",
         btn_music: "🎵 Musiqa qidirish",
         btn_audio_version: "🎧 Audio talqini",
-        btn_find_music: "🔍 Musiqa topish"
+        btn_find_music: "🔍 Musiqa topish",
+        quota_exceeded: "⚠️ **Kunlik limit tugadi.**\n\nSiz bugun {limit} ta yuklash imkoniyatidan foydalandingiz. Ertaga yana urinib ko'ring yoki admin bilan bog'laning.",
+        quota_info: "📊 **Sizning limitingiz:** {remaining}/{limit}",
+        menu_discovery: "🎲 Tasodifiy video"
     },
     uz_cyrl: {
         welcome: "🌟 **Ассалому алайкум! SadoMedia Bot га хуш келибсиз!**\n\n🤖 **Мени орқали сиз қуйидаги ижтимоий тармоқлардан видео юклашингиз мумкин:**\n• YouTube, Instagram, TikTok 📥\n\n• Мусиқа қидириш ва юклаб олиш 🎵\n• Аудио орқали мусиқа топиш 🎙\n\n👇 **Фойдаланиш учун:**\n\n1. 🎵 **Мусиқа қидириш:** Ижрочи ёки қўшиқ номи юборинг.\n2. 🎙 **Аудио орқали мусиқа топиш:** Овозли хабар ёки аудио файл юборинг.\n3. 📹 **Медиа:** Ҳаволани (link) юборинг.",
@@ -116,7 +119,10 @@ const TEXTS = {
         btn_audio: "🎧 Аудио (MP3)",
         btn_music: "🎵 Мусиқа қидириш",
         btn_audio_version: "🎧 Аудио талқини",
-        btn_find_music: "🔍 Мусиқа топиш"
+        btn_find_music: "🔍 Мусиқа топиш",
+        quota_exceeded: "⚠️ **Кунлик лимит тугади.**\n\nСиз бугун {limit} та юклаш имкониятидан фойдаландингиз. Эртага яна уриниб кўринг ёки админ билан боғланинг.",
+        quota_info: "📊 **Сизнинг лимитингиз:** {remaining}/{limit}",
+        menu_discovery: "🎲 Тасодифий видео"
     },
     ru: {
         welcome: "🌟 **Привет! Добро пожаловать в SadoMedia Bot!**\n\n🤖 **Я могу скачивать видео из следующих соцсетей:**\n• YouTube, Instagram, TikTok 📥\n\n• Поиск и скачивание музыки 🎵\n• Найти музыку по аудио 🎙\n\n👇 **Как пользоваться:**\n\n1. 🎵 **Поиск музыки:** Отправьте имя исполнителя или название песни.\n2. 🎙 **Найти музыку по аудио:** Отправьте голосовое сообщение или аудиофайл.\n3. 📹 **Медиа:** Отправьте ссылку (link).",
@@ -176,7 +182,10 @@ const TEXTS = {
         btn_audio: "🎧 Аудио (MP3)",
         btn_music: "🎵 Поиск музыки",
         btn_audio_version: "🎧 Аудио версия видео",
-        btn_find_music: "🔍 Найти музыку"
+        btn_find_music: "🔍 Найти музыку",
+        quota_exceeded: "⚠️ **Дневной лимит исчерпан.**\n\nВы использовали {limit} загрузок на сегодня. Попробуйте завтра или свяжитесь с админом.",
+        quota_info: "📊 **Ваш лимит:** {remaining}/{limit}",
+        menu_discovery: "🎲 Случайное видео"
     },
     en: {
         welcome: "🌟 **Hello! Welcome to SadoMedia Bot!**\n\n🤖 **I can download videos from:**\n• YouTube, Instagram, TikTok 📥\n\n• Search and download music 🎵\n• Find music by audio 🎙\n\n👇 **How to use:**\n\n1. 🎵 **Search Music:** Send Artist/Song name.\n2. 🎙 **Find Music by Audio:** Send a voice message or audio file.\n3. 📹 **Media:** Send link.",
@@ -236,7 +245,10 @@ const TEXTS = {
         btn_audio: "🎧 Audio (MP3)",
         btn_music: "🎵 Search Music",
         btn_audio_version: "🎧 Audio version of the video",
-        btn_find_music: "🔍 Find music"
+        btn_find_music: "🔍 Find music",
+        quota_exceeded: "⚠️ **Daily limit reached.**\n\nYou have used {limit} downloads today. Please try again tomorrow or contact admin.",
+        quota_info: "📊 **Your limit:** {remaining}/{limit}",
+        menu_discovery: "🎲 Random Video"
     }
 };
 
